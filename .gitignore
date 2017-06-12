@@ -99,3 +99,9 @@ ENV/
 
 # mypy
 .mypy_cache/
+
+# image big data
+input/
+
+# ref_repo 
+CycleGAN/
