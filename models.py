@@ -253,7 +253,7 @@ class CycleGAN:
 			This function saves the gen images to A/B image pools.
 			The return value represent the gen images to training
 		'''
-		overfull_num = pool_size - (num_fakes + len(new_fakes) - 1)
+		overfull_num = (num_fakes + len(new_fakes) - 1) - pool_size
 		
 		if overfull_num > 0:
 			fake_pool = np.roll(fake_pool, -overfull_num)

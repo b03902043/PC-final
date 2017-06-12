@@ -12,10 +12,10 @@ import numpy as np
 from PIL import Image
 import matplotlib as mpl
 try:
-	mpl.use('TkAgg')
+	mpl.use('Agg')
 except:
 	try:
-		mpl.use('Agg')
+		mpl.use('TkAgg')
 	except:
 		print ('Your platform cannot use matplotlib')
 		HasMatPlotLib = False
