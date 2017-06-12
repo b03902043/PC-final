@@ -13,10 +13,17 @@ from keras.callbacks import LearningRateScheduler
 from keras.optimizers import Adam
 from PIL import Image
 import numpy as np
+import tensorflow as tf
 
 from layer_utils import *
 
+lambda_gan = 10
+batch_size = 1
+pool_size = 50
 adam = Adam(lr=0.0002, beta_1=0.5, beta_2=0.999)
+
+def disc_loss(y_true, y_pred):
+	return (tf.reduce_mean(tf.square(y_pred)) + tf.reduce_mean(tf.squared_difference(y_true, 1)))/2.0
 
 def scheduler(epoch):
 	lr_base = 0.0002
@@ -58,7 +65,7 @@ class Generator:
 		gen = BatchNormalization()(nn)
 		
 		generator = Model(inputs=input_gen, outputs=gen)
-		generator.compile(loss='binary_crossentropy', optimizer=adam)
+		# generator.compile(loss='binary_crossentropy', optimizer=adam)
 		if needSum:
 			generator.summary()
 		# plot_model(generator, to_file='gen.png')
@@ -69,6 +76,15 @@ class Generator:
 		if not hasattr(next_networks, 'model'):
 			raise 'In {}, argument \"next_model\" does not have model attribute '.format(self.__class__.__name__)
 		return Model(inputs=self.model.input, outputs=next_networks.model(self.model.output))
+
+	def predict(self, **kwargs):
+		return self.model.predict(**kwargs)
+
+	def fit(self, **kwargs):
+		return self.model.fit(**kwargs)
+
+	def compile(self, **kwargs):
+		return self.model.compile(**kwargs)
 
 class Discriminator:
 	def __init__(self, num_features=64, img_w=256, img_h=256, img_l=3, name='discriminator'):
@@ -98,7 +114,7 @@ class Discriminator:
 		dis = Conv2D(1, (filter_w, filter_w), strides=(1, 1), padding='same',
 			kernel_initializer=TruncatedNormal(stddev=0.02), bias_initializer=Constant(0.0))(nn)
 		discriminator = Model(inputs=input_dis, outputs=dis)
-		discriminator.compile(loss=, optimizer=adam)
+		# discriminator.compile(loss=, optimizer=adam)
 		if needSum:
 			discriminator.summary()
 		return discriminator
@@ -108,64 +124,115 @@ class Discriminator:
 			raise 'In {}, argument \"next_model\" does not have model attribute '.format(self.__class__.__name__)
 		return Model(inputs=self.model.input, outputs=next_networks.model(self.model.output))
 
+	def predict(self, **kwargs):
+		return self.model.predict(**kwargs)
+
+	def fit(self, **kwargs):
+		return self.model.fit(**kwargs)
+
+	def compile(self, **kwargs):
+		return self.model.compile(**kwargs)
 
 class CycleGAN:
-	def __init__(self):
+
+	def __init__(self, shape = (256, 256, 3), dis_iter = 32):
 		# print 'Init CycleGAN'
-		self.gopt = Adam(lr=0.0002, beta_1=0.5)
-		self.dopt = Adam(lr=0.0002, beta_1=0.5)
+		self.shp = shape
+		self.gopt = Adam(lr=0.0002, beta_1=0.5, beta_2=0.999)
+		self.dopt = Adam(lr=0.0002, beta_1=0.5, beta_2=0.999)
+		self.fake_images_A, self.fake_num_A = np.zeros((pool_size, 1,) + shape), 0
+		self.fake_images_B, self.fake_num_B = np.zeros((pool_size, 1,) + shape), 0
+		self.d_iter = dis_iter
 		self.setup_model()
 
-	def setup_input(self, A = None, B = None):
-		img_num = 30
-		self.inputA = randReadImg('A', img_num)
-		self.inputB = randReadImg('B', img_num)
+	def collect_images(self, A = None, B = None):
+		self.batch_img_num = 10
+		self.inputA = randReadImg('A', self.batch_img_num)
+		self.inputB = randReadImg('B', self.batch_img_num)
 
 	'''
 		The function setup the model for training
 		genB/ genA : Generated images by corresponding generator of input_A and input_B
 		cyc_A/ cyc_B : Images generated after feeding genA/genB to corresponding generator. This is use to calcualte cyclic loss
 	'''
-
 	def setup_model(self):
-		# if self.inputA is None or self.inputB is None:
+		# if not hasattr(self, 'inputA') or not hasattr(self, 'inputB'):
 		# 	raise Exception('Input must be assigned before setup model')
 
 		self.genB = Generator(name='GenA2B')
 		self.genA = Generator(name='GenB2A')
-		self.clf_A = Discriminator(name='ClfA')
-		self.clf_B = Discriminator(name='ClfB')
+		self.clf_A = Discriminator(name='clf_A')
+		self.clf_B = Discriminator(name='clf_B')
 
-		self.clf_gen = self.genA.connect(Discriminator(name='clfA'))
-		self.clf_gen = self.genB.connect(Discriminator(name='clfB'))
+		self.clf_genA = self.genA.connect(Discriminator(name='clf_A'))
+		self.clf_genB = self.genB.connect(Discriminator(name='clf_B'))
 		self.cyc_A = self.genB.connect(Generator(name='GenB2A'))
 		self.cyc_B = self.genA.connect(Generator(name='GenA2B'))
 
 		# plot_model(self.cyc_A, to_file='cycA.png')
 		self.cyc_A.summary()
 		# self.cyc_A.compile(optimizer=opt)
+		self.trainnerG = Model([ self.genB.model.input, self.genA.model.input ],
+			[self.clf_genB.output, self.clf_genA.output, self.cyc_A.output, self.cyc_B.output])
+		self.trainnerG.compile(optimizer=self.gopt, 
+			loss=['MSE', 'MSE', 'MAE', 'MAE'], 
+			loss_weight=[1, 1, lambda_gan, lambda_gan])
 
-	
+		self.real_A, self.real_B, self.fake_A, self.fake_B = Input(self.shp), Input(self.shp), Input(self.shp), Input(self.shp)
+		self.clf_real_A, self.clf_real_B, self.clf_fake_A, self.clf_fake_B = self.clf_A.model(self.real_A),	\
+			self.clf_B.model(self.real_B), self.clf_A.model(self.fake_A), self.clf_B.model(self.fake_B)
 
-	# def __call__(self, input):
-	# 	self.
-		# Build GAN model
+		self.trainnerD = Model([self.real_A, self.fake_A, self.real_B, self.fake_B], 
+			[self.clf_real_A, self.clf_fake_A, self.clf_real_B, self.clf_fake_B])
+		self.trainnerD.compile(optimizer=self.dopt, loss='MSE')
 
+	def fit(self, epoch_num = 10):
+		for i in range(epoch_num):
 
-# gan_input = Input(shape=[100])
-# H = generator(gan_input)
-# gan_V = discriminator(H)
-# GAN = Model(gan_input, gan_V)
-# GAN.compile(loss='categorical_crossentropy', optimizer=opt)
-# GAN.summary()
+			self.collect_images()
 
-# 		dec_gen_A = build_discriminator(gen_A, "discriminator_A")
-# 		dec_gen_B = build_discriminator(gen_B, "discriminator_B")
-# 		cyc_A = build_generator(gen_B, "generator_BtoA")
-# 		cyc_B = build_generator(gen_A, "generator_AtoB")
+			A_fake = self.update_fake_pool(self.fake_images_A, self.genA.predict(x=self.inputB), self.fake_num_A)
+			B_fake = self.update_fake_pool(self.fake_images_B, self.genB.predict(x=self.inputA), self.fake_num_B)
 
+			ones  = np.ones((self.batch_img_num,) + self.trainnerG.output_shape[0][1:])
+			zeros = np.zeros((self.batch_img_num, ) + self.trainnerG.output_shape[0][1:])
 
+			# train discriminator
+			for _ in range(self.d_iter):
+				_, rA_dloss, fA_dloss, rB_dloss, fB_dloss = self.trainnerD.train_on_batch([self.inputA, A_fake, self.inputB, B_fake], 
+					[zeros, ones * 0.9, zeros, ones * 0.9])	# label given (assign real=0, fake=0.9)
 
+			# train generator
+			# Target "zero" represent the classifier assume A -gen-> B -clf-> B (100%)
+			# That is, generator can cheat clf
+			_, rA_gloss, fA_gloss, rB_gloss, fB_gloss = self.trainnerG.train_on_batch([self.inputA, self.inputB],
+				[zeros, zeros, self.inputA, self.inputB])	
+			
+			print ('Generator Loss:')
+			pritn ('Real A: {}, Fake A: {}, Real B: {}, Fake B: {}'.format(rA_gloss, fA_gloss, rB_gloss, fB_gloss))
 
+			print ('Discriminator Loss:')
+			pritn ('Real A: {}, Fake A: {}, Real B: {}, Fake B: {}'.format(rA_dloss, fA_dloss, rB_dloss, fB_dloss))
 
+			print ('Discriminator A (accuracy) : real({}), fake({})'.format(
+				self.clf_A.predict(x=self.inputA).mean(), self.clf_A.predict(x=A_fake).mean()))
+
+			self.fake_num_A += self.batch_img_num
+			self.fake_num_B += self.batch_img_num
+
+	def update_fake_pool(self, fake_pool, new_fakes, num_fakes):
+		'''
+			This function saves the gen images to A/B image pools.
+			The return value represent the gen images to training
+		'''
+		overfull_num = pool_size - (num_fakes + len(new_fakes) - 1)
+		
+		if overfull_num > 0:
+			fake_pool = np.roll(fake_pool, -overfull_num)
+			ret_images = fake_pool[-len(new_fakes):].copy()	# this part can be random swap-in return images
+			fake_pool[-len(new_fakes):] = new_fakes
+		else:
+			fake_pool[num_fakes : num_fakes + len(new_fakes) - 1] = new_fakes
+
+		return fake_pool[np.random.choice(num_fakes - overfull_num, size=len(new_fakes), replace=False)]
 

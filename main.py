@@ -1,8 +1,7 @@
 from models import *
-import tensorflow as tf
+from layer_utils import *
+import os, sys
 
-def disc_loss(y_true, y_pred):
-	return (tf.reduce_mean(tf.square(self.fake_pool_rec_A)) + tf.reduce_mean(tf.squared_difference(self.rec_A, 1)))/2.0
 
 # Freeze weights in the discriminator for stacked training
 def make_trainable(net, val):
@@ -12,4 +11,13 @@ def make_trainable(net, val):
 
 cycle_gan = CycleGAN()
 cycle_gan.setup_model()
-cycle_gan.cyc_A.compile(optimizer=cycle_gan.gopt, loss=disc_loss)
+try:
+	cycle_gan.fit(epoch_num=10)
+except KeyboardInterrupt:
+	K.clear_session()
+	try:
+		sys.exit(0)
+	except SystemExit:
+		os._exit(0)
+else:
+	K.clear_session()
