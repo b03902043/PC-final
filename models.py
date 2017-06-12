@@ -195,7 +195,7 @@ class CycleGAN:
 
 	def fit(self, epoch_num = 10, disc_iter = 10, save_period = 1, pic_dir = None):
 		for i in range(epoch_num):
-
+			print ('Epoch {}'.format(i+1))
 			self.collect_images()
 
 			A_fake = self.update_fake_pool(self.fake_images_A, self.genA.predict(x=self.inputB), self.fake_num_A)

@@ -9,9 +9,14 @@ def make_trainable(net, val):
 	for l in net.layers:
 		l.trainable = val
 
+output_folder = 'output'
+
+if not os.path.isdir(output_folder):
+	os.makedirs(output_folder)
+
 cycle_gan = CycleGAN()
 try:
-	cycle_gan.fit(epoch_num=10)
+	cycle_gan.fit(epoch_num=200, disc_iter = 10, save_period = 1, pic_dir = output_folder)
 except KeyboardInterrupt:
 	K.clear_session()
 	try:
