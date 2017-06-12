@@ -260,7 +260,7 @@ class CycleGAN:
 			ret_images = fake_pool[-len(new_fakes):].copy()	# this part can be random swap-in return images
 			fake_pool[-len(new_fakes):] = new_fakes
 		else:
-			fake_pool[num_fakes : num_fakes + len(new_fakes) - 1] = new_fakes
+			fake_pool[num_fakes : num_fakes + len(new_fakes)] = new_fakes
 
 		return fake_pool[np.random.choice(num_fakes - overfull_num, size=len(new_fakes), replace=False)]
 
