@@ -14,6 +14,8 @@ from keras.optimizers import Adam
 from PIL import Image
 import numpy as np
 import tensorflow as tf
+import pickle as pkl
+import os
 
 from layer_utils import *
 
@@ -86,6 +88,9 @@ class Generator:
 	def compile(self, **kwargs):
 		return self.model.compile(**kwargs)
 
+	def save(self, path):
+		self.model.save_weights(path)
+
 class Discriminator:
 	def __init__(self, num_features=64, img_w=256, img_h=256, img_l=3, name='discriminator'):
 		self.nf = num_features
@@ -133,16 +138,18 @@ class Discriminator:
 	def compile(self, **kwargs):
 		return self.model.compile(**kwargs)
 
+	def save(self, path):
+		self.model.save_weights(path)
+
 class CycleGAN:
 
-	def __init__(self, shape = (256, 256, 3), dis_iter = 32):
+	def __init__(self, shape = (256, 256, 3)):
 		# print 'Init CycleGAN'
 		self.shp = shape
 		self.gopt = Adam(lr=0.0002, beta_1=0.5, beta_2=0.999)
 		self.dopt = Adam(lr=0.0002, beta_1=0.5, beta_2=0.999)
 		self.fake_images_A, self.fake_num_A = np.zeros((pool_size, ) + shape), 0
 		self.fake_images_B, self.fake_num_B = np.zeros((pool_size, ) + shape), 0
-		self.d_iter = dis_iter
 		self.setup_model()
 
 	def collect_images(self, A = None, B = None):
@@ -186,7 +193,7 @@ class CycleGAN:
 			[self.clf_real_A, self.clf_fake_A, self.clf_real_B, self.clf_fake_B])
 		self.trainnerD.compile(optimizer=self.dopt, loss='MSE')
 
-	def fit(self, epoch_num = 10):
+	def fit(self, epoch_num = 10, disc_iter = 10, save_period = 1, pic_dir = None):
 		for i in range(epoch_num):
 
 			self.collect_images()
@@ -198,7 +205,7 @@ class CycleGAN:
 			zeros = np.zeros((self.batch_img_num, ) + self.trainnerG.output_shape[0][1:])
 
 			# train discriminator
-			for _ in range(self.d_iter):
+			for _ in range(disc_iter):
 				_, rA_dloss, fA_dloss, rB_dloss, fB_dloss = self.trainnerD.train_on_batch([self.inputA, A_fake, self.inputB, B_fake], 
 					[zeros, ones * 0.9, zeros, ones * 0.9])	# label given (assign real=0, fake=0.9)
 
@@ -216,6 +223,27 @@ class CycleGAN:
 
 			print ('Discriminator A (accuracy) : real({}), fake({})'.format(
 				self.clf_A.predict(x=self.inputA).mean(), self.clf_A.predict(x=A_fake).mean()))
+
+			if (i+1) % save_period == 0 and pic_dir is not None:
+
+				ImageA = self.inputA # N * W * W * l
+				ImageA2B = self.genB.predict(x=self.inputA)
+				ImageA2B2A = self.genA.predict(x=ImageA2B)
+				ImageB = self.inputB # 1 * N * W * W * l
+				ImageB2A = self.genA.predict(x=self.inputB)
+				ImageB2A2B = self.genB.predict(x=ImageB2A)
+
+				ImageA2B = sharpen(ImageA2B)
+				ImageA2B2A = sharpen(ImageA2B2A)
+				ImageB2A = sharpen(ImageB2A)
+				ImageB2A2B = sharpen(ImageB2A2B)
+
+				Imgs = np.r_[ ImageA, ImageA2B, ImageA2B2A, ImageB, ImageB2A, ImageB2A2B ]
+
+				saveImg(Imgs, sub_w = len(ImageA), path = os.path.join(pic_dir, '{}.jpg'.format(i)))
+
+				self.genB.save(os.path.join(pic_dir, 'a2b.h5'))
+				self.genA.save(os.path.join(pic_dir, 'b2a.h5'))
 
 			self.fake_num_A += self.batch_img_num
 			self.fake_num_B += self.batch_img_num
@@ -235,4 +263,5 @@ class CycleGAN:
 			fake_pool[num_fakes : num_fakes + len(new_fakes) - 1] = new_fakes
 
 		return fake_pool[np.random.choice(num_fakes - overfull_num, size=len(new_fakes), replace=False)]
+
 
