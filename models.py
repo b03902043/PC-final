@@ -216,10 +216,10 @@ class CycleGAN:
 				[zeros, zeros, self.inputA, self.inputB])	
 			
 			print ('Generator Loss:')
-			pritn ('Real A: {}, Fake A: {}, Real B: {}, Fake B: {}'.format(rA_gloss, fA_gloss, rB_gloss, fB_gloss))
+			print ('Real A: {}, Fake A: {}, Real B: {}, Fake B: {}'.format(rA_gloss, fA_gloss, rB_gloss, fB_gloss))
 
 			print ('Discriminator Loss:')
-			pritn ('Real A: {}, Fake A: {}, Real B: {}, Fake B: {}'.format(rA_dloss, fA_dloss, rB_dloss, fB_dloss))
+			print ('Real A: {}, Fake A: {}, Real B: {}, Fake B: {}'.format(rA_dloss, fA_dloss, rB_dloss, fB_dloss))
 
 			print ('Discriminator A (accuracy) : real({}), fake({})'.format(
 				self.clf_A.predict(x=self.inputA).mean(), self.clf_A.predict(x=A_fake).mean()))
