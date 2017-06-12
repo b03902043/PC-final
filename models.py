@@ -15,7 +15,7 @@ from PIL import Image
 import numpy as np
 import tensorflow as tf
 import pickle as pkl
-import os
+import os, sys
 
 from layer_utils import *
 
@@ -223,6 +223,8 @@ class CycleGAN:
 
 			print ('Discriminator A (accuracy) : real({}), fake({})'.format(
 				self.clf_A.predict(x=self.inputA).mean(), self.clf_A.predict(x=A_fake).mean()))
+
+			sys.stdout.flush()
 
 			if (i+1) % save_period == 0 and pic_dir is not None:
 
