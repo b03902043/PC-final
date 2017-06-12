@@ -140,8 +140,8 @@ class CycleGAN:
 		self.shp = shape
 		self.gopt = Adam(lr=0.0002, beta_1=0.5, beta_2=0.999)
 		self.dopt = Adam(lr=0.0002, beta_1=0.5, beta_2=0.999)
-		self.fake_images_A, self.fake_num_A = np.zeros((pool_size, 1,) + shape), 0
-		self.fake_images_B, self.fake_num_B = np.zeros((pool_size, 1,) + shape), 0
+		self.fake_images_A, self.fake_num_A = np.zeros((pool_size, ) + shape), 0
+		self.fake_images_B, self.fake_num_B = np.zeros((pool_size, ) + shape), 0
 		self.d_iter = dis_iter
 		self.setup_model()
 
