@@ -10,7 +10,6 @@ def make_trainable(net, val):
 		l.trainable = val
 
 cycle_gan = CycleGAN()
-cycle_gan.setup_model()
 try:
 	cycle_gan.fit(epoch_num=10)
 except KeyboardInterrupt:
