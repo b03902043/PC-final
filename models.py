@@ -226,8 +226,6 @@ class CycleGAN:
 
 		self.clf_genA = self.clf_A.model(self.fakeA)
 		self.clf_genB = self.clf_B.model(self.fakeB)
-		self.clf_realA = self.clf_A.model(self.realA)
-		self.clf_realB = self.clf_B.model(self.realB)
 
 		self.cyc_A = self.genA.model(self.fakeB)
 		self.cyc_B = self.genB.model(self.fakeA)	
@@ -241,11 +239,18 @@ class CycleGAN:
 			loss=['MSE', 'MSE', 'MAE', 'MAE'], 
 			loss_weights=[1, 1, lambda_gan, lambda_gan])
 
+		self.fakeA, self.fakeB = Input(self.shp), Input(self.shp)
+
+		self.clf_genA = self.clf_A.model(self.fakeA)
+		self.clf_genB = self.clf_B.model(self.fakeB)
+		self.clf_realA = self.clf_A.model(self.realA)
+		self.clf_realB = self.clf_B.model(self.realB)
+
 		# self.real_A, self.real_B, self.fake_A, self.fake_B = Input(self.shp), Input(self.shp), Input(self.shp), Input(self.shp)
 		# self.clf_real_A, self.clf_real_B, self.clf_fake_A, self.clf_fake_B = self.clf_A.model(self.real_A),	\
 		# 	self.clf_B.model(self.real_B), self.clf_A.model(self.fake_A), self.clf_B.model(self.fake_B)
 
-		self.trainnerD = Model([self.realA, Input(self.shp, tensor=self.fakeA), self.realB, Input(self.shp, tensor=self.fakeB)], 
+		self.trainnerD = Model([ self.realA, self.fakeA, self.realB, self.fakeB ], 
 			[self.clf_realA, self.clf_genA, self.clf_realB, self.clf_genB])
 		self.trainnerD.compile(optimizer=self.dopt, loss='MSE')
 
@@ -262,7 +267,7 @@ class CycleGAN:
 
 			# train discriminator
 			for _ in range(disc_iter):
-				_, rA_dloss, fA_dloss, rB_dloss, fB_dloss = self.trainnerD.train_on_batch([self.inputA, self.A_fake, self.inputB, self.B_fake], 
+				_, rA_dloss, fA_dloss, rB_dloss, fB_dloss = self.trainnerD.train_on_batch([self.inputA, self.A_fake, self.inputB, self.B_fake],
 					[zeros, ones * 0.9, zeros, ones * 0.9])	# label given (assign real=0, fake=0.9)
 
 			# train generator
