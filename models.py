@@ -245,7 +245,7 @@ class CycleGAN:
 		# self.clf_real_A, self.clf_real_B, self.clf_fake_A, self.clf_fake_B = self.clf_A.model(self.real_A),	\
 		# 	self.clf_B.model(self.real_B), self.clf_A.model(self.fake_A), self.clf_B.model(self.fake_B)
 
-		self.trainnerD = Model([self.realA, Input(tensor=self.fakeA), self.realB, Input(tensor=self.fakeB)], 
+		self.trainnerD = Model([self.realA, Input(self.shp, tensor=self.fakeA), self.realB, Input(self.shp, tensor=self.fakeB)], 
 			[self.clf_realA, self.clf_genA, self.clf_realB, self.clf_genB])
 		self.trainnerD.compile(optimizer=self.dopt, loss='MSE')
 
@@ -254,15 +254,15 @@ class CycleGAN:
 			print ('Epoch {}'.format(i+1))
 			self.collect_images()
 
-			A_fake = self.update_fake_pool(self.fake_images_A, self.genA.predict(self.inputB), self.fake_num_A)
-			B_fake = self.update_fake_pool(self.fake_images_B, self.genB.predict(self.inputA), self.fake_num_B)
+			self.A_fake = self.update_fake_pool(self.fake_images_A, self.genA.predict(self.inputB), self.fake_num_A)
+			self.B_fake = self.update_fake_pool(self.fake_images_B, self.genB.predict(self.inputA), self.fake_num_B)
 
 			ones  = np.ones((self.batch_img_num,) + self.trainnerG.output_shape[0][1:])
 			zeros = np.zeros((self.batch_img_num, ) + self.trainnerG.output_shape[0][1:])
 
 			# train discriminator
 			for _ in range(disc_iter):
-				_, rA_dloss, fA_dloss, rB_dloss, fB_dloss = self.trainnerD.train_on_batch([self.inputA, A_fake, self.inputB, B_fake], 
+				_, rA_dloss, fA_dloss, rB_dloss, fB_dloss = self.trainnerD.train_on_batch([self.inputA, self.A_fake, self.inputB, self.B_fake], 
 					[zeros, ones * 0.9, zeros, ones * 0.9])	# label given (assign real=0, fake=0.9)
 
 			# train generator
