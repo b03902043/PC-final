@@ -23,6 +23,7 @@ lambda_gan = 10
 batch_size = 1
 pool_size = 50
 adam = Adam(lr=0.0002, beta_1=0.5, beta_2=0.999)
+i_layerid, o_layerid = 0, 0
 
 def disc_loss(y_true, y_pred):
 	return (tf.reduce_mean(tf.square(y_pred)) + tf.reduce_mean(tf.squared_difference(y_true, 1)))/2.0
@@ -33,15 +34,26 @@ def scheduler(epoch):
 		return lr_base * (200 - epoch)
 	return lr_base
 
+def init_network(model):
+	for w in model.weights:
+		if w.name.startswith('conv2d') and w.name.endswith('kernel'):
+			value = np.random.normal(loc=0.0, scale=0.02, size=w.get_value().shape)
+			w.set_value(value.astype('float32'))
+		if w.name.startswith('conv2d') and w.name.endswith('bias'):
+			value = np.zeros(w.get_value().shape)
+			w.set_value(value.astype('float32'))
+	return model
+
 class Generator:
 
-	def __init__(self, num_features=64, img_w=256, img_h=256, img_l=3, name='generator'):
+	def __init__(self, num_features=64, img_w=256, img_h=256, img_l=3, name='generator', Cmodel = None):
 		self.nf = num_features
 		self.img_size = (img_w, img_h, img_l)
 		self.name = name
-		self.model = self.build_model(needSum=False)
+		self.input_num = 0	# input_num
+		self.model = self.build_model() if Cmodel is None else Cmodel
 
-	def build_model(self, needSum = True):
+	def build_model(self, needSum = False):
 		input_gen = Input(shape=self.img_size)
 		# print ('input shape : ' + str(input_gen.get_shape()))
 		nn = Conv2D(self.nf, (7, 7), strides=(1, 1), padding='same')(input_gen)
@@ -76,17 +88,23 @@ class Generator:
 		nn = ZeroPadding2D((3, 3))(nn)
 		gen = Conv2D(3, (7, 7), activation='tanh', strides=(1, 1), padding='valid')(nn)
 		
-		generator = Model(inputs=input_gen, outputs=gen, name=self.name)
+		generator = Model(inputs=input_gen, outputs=gen)
 		if needSum:
 			generator.summary()
 		# plot_model(generator, to_file='gen.png')
 
 		return generator
 
-	def connect(self, next_networks):
+	def connect(self, next_networks, input_id = 0):
 		if not hasattr(next_networks, 'model'):
 			raise 'In {}, argument \"next_model\" does not have model attribute '.format(self.__class__.__name__)
-		return Model(inputs=self.model.input, outputs=next_networks.model(self.model.output))
+		# return Generator(Cmodel=Model(inputs=self.model.input, outputs=next_networks.model(self.model.output)))
+		# if self.input_num < input_id:
+			# raise 'Input out of bound error'
+		# next_networks.input_num += 1
+		return next_networks.model(self.model.output)
+		# return Model(inputs=self.model.get_input_at(input_id), outputs=next_networks.model(self.model.output))
+		# return Model(inputs=Input(shape=self.img_size), outputs=next_networks.model(self.model.output))
 
 	def predict(self, X):
 		return self.model.predict(X)
@@ -101,13 +119,14 @@ class Generator:
 		self.model.save_weights(path)
 
 class Discriminator:
-	def __init__(self, num_features=64, img_w=256, img_h=256, img_l=3, name='discriminator'):
+	def __init__(self, num_features=64, img_w=256, img_h=256, img_l=3, name='discriminator', Cmodel = None):
 		self.nf = num_features
 		self.img_size = (img_w, img_h, img_l)
 		self.name = name
-		self.model = self.build_model(needSum=False)
+		self.input_num = 0	# input_num
+		self.model = self.build_model() if Cmodel is None else Cmodel
 
-	def build_model(self, needSum = True, needSigmoid = False):
+	def build_model(self, needSum = False, needSigmoid = False):
 		filter_w = 4
 		input_dis = Input(shape=self.img_size)
 		nn = Conv2D(self.nf, (filter_w, filter_w), strides=(2, 2), padding='same',
@@ -134,16 +153,26 @@ class Discriminator:
 		if needSigmoid:
 			nn = Activation('sigmoid')(nn)
 
-		discriminator = Model(inputs=input_dis, outputs=nn, name=self.name)
+		discriminator = Model(inputs=input_dis, outputs=nn)
 		# discriminator.compile(loss=, optimizer=adam)
 		if needSum:
 			discriminator.summary()
 		return discriminator
 
-	def connect(self, next_networks):
+	def connect(self, next_networks, input_id = 0):
 		if not hasattr(next_networks, 'model'):
 			raise 'In {}, argument \"next_model\" does not have model attribute '.format(self.__class__.__name__)
-		return Model(inputs=self.model.input, outputs=next_networks.model(self.model.output))
+		# return Discriminator(Cmodel=Model(inputs=self.model.input, outputs=next_networks.model(self.model.output)))
+		# next_networks.conn[0] += 1
+		# i_layerid = self.conn[0]
+		# o_layerid = self.conn[1] - 1
+		# self.conn[1] += 1
+		# if self.input_num < input_id:
+		# 	raise 'Input out of bound error'
+		# next_networks.input_num += 1
+		return next_networks.model(self.model.output)
+		# return Model(inputs=self.model.get_input_at(input_id), outputs=next_networks.model(self.model.output))
+		# return Model(inputs=self.model.get_input_at(input_id), outputs=next_networks.model(self.model.output))
 
 	def predict(self, X):
 		return self.model.predict(X)
@@ -184,29 +213,40 @@ class CycleGAN:
 
 		self.genB = Generator(name='GenA2B')
 		self.genA = Generator(name='GenB2A')
-		self.clf_A = Discriminator(name='clf_A')
+		self.clf_A = Discriminator(name='clf_A')	# clf input0 = real, input1 = fake
 		self.clf_B = Discriminator(name='clf_B')
 
-		self.clf_genA = self.genA.connect(Discriminator(name='clf_A'))
-		self.clf_genB = self.genB.connect(Discriminator(name='clf_B'))
-		self.cyc_A = self.genB.connect(Generator(name='GenB2A'))
-		self.cyc_B = self.genA.connect(Generator(name='GenA2B'))
+		init_network(self.genA.model)
+		init_network(self.genB.model)
+		init_network(self.clf_A.model)
+		init_network(self.clf_B.model)
+
+		self.realA, self.realB = Input(self.shp), Input(self.shp)
+		self.fakeA, self.fakeB = self.genA.model(self.realB), self.genB.model(self.realA)
+
+		self.clf_genA = self.clf_A.model(self.fakeA)
+		self.clf_genB = self.clf_B.model(self.fakeB)
+		self.clf_realA = self.clf_A.model(self.realA)
+		self.clf_realB = self.clf_B.model(self.realB)
+
+		self.cyc_A = self.genA.model(self.fakeB)
+		self.cyc_B = self.genB.model(self.fakeA)	
 
 		# plot_model(self.cyc_A, to_file='cycA.png')
-		self.cyc_A.summary()
+		# self.cyc_A.summary()
 		# self.cyc_A.compile(optimizer=opt)
-		self.trainnerG = Model([ self.genB.model.input, self.genA.model.input ],
-			[self.clf_genB.output, self.clf_genA.output, self.cyc_A.output, self.cyc_B.output])
+		self.trainnerG = Model([ self.realA, self.realB ],
+			[self.clf_genB, self.clf_genA, self.cyc_A, self.cyc_B])
 		self.trainnerG.compile(optimizer=self.gopt, 
 			loss=['MSE', 'MSE', 'MAE', 'MAE'], 
 			loss_weights=[1, 1, lambda_gan, lambda_gan])
 
-		self.real_A, self.real_B, self.fake_A, self.fake_B = Input(self.shp), Input(self.shp), Input(self.shp), Input(self.shp)
-		self.clf_real_A, self.clf_real_B, self.clf_fake_A, self.clf_fake_B = self.clf_A.model(self.real_A),	\
-			self.clf_B.model(self.real_B), self.clf_A.model(self.fake_A), self.clf_B.model(self.fake_B)
+		# self.real_A, self.real_B, self.fake_A, self.fake_B = Input(self.shp), Input(self.shp), Input(self.shp), Input(self.shp)
+		# self.clf_real_A, self.clf_real_B, self.clf_fake_A, self.clf_fake_B = self.clf_A.model(self.real_A),	\
+		# 	self.clf_B.model(self.real_B), self.clf_A.model(self.fake_A), self.clf_B.model(self.fake_B)
 
-		self.trainnerD = Model([self.real_A, self.fake_A, self.real_B, self.fake_B], 
-			[self.clf_real_A, self.clf_fake_A, self.clf_real_B, self.clf_fake_B])
+		self.trainnerD = Model([self.realA, Input(tensor=self.fakeA), self.realB, Input(tensor=self.fakeB)], 
+			[self.clf_realA, self.clf_genA, self.clf_realB, self.clf_genB])
 		self.trainnerD.compile(optimizer=self.dopt, loss='MSE')
 
 	def fit(self, epoch_num = 10, disc_iter = 10, save_period = 1, pic_dir = None):
