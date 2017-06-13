@@ -255,7 +255,7 @@ class CycleGAN:
 				ImageB2A = sharpen(ImageB2A)
 				ImageB2A2B = sharpen(ImageB2A2B)
 
-				Imgs = np.r_[ ImageA, ImageA2B, ImageA2B2A, ImageB, ImageB2A, ImageB2A2B ]
+				Imgs = np.r_[ ImageA, ImageA2B, ImageA2B2A, ImageB, ImageB2A, ImageB2A2B ].astype(np.uint8)
 
 				saveImg(Imgs, sub_w = len(ImageA), path = os.path.join(pic_dir, '{}.jpg'.format(i)))
 
