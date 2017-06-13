@@ -1,6 +1,6 @@
 from keras.models import Model, Sequential, model_from_json
 from keras.layers import Input, Flatten, Dropout, Embedding, Dense, Activation, Merge
-from keras.layers.convolutional import Conv2D, Conv2DTranspose
+from keras.layers.convolutional import Conv2D, Conv2DTranspose, UpSampling2D
 from keras.layers.core import Dense, Dropout, Activation, Reshape
 from keras.layers.pooling import MaxPooling2D
 from keras.layers.merge import Add, Concatenate, Dot
@@ -59,6 +59,15 @@ class InstanceNormalization2D(Layer):
 
 	def compute_output_shape(self, input_shape):
 		return input_shape 
+
+class DeConv2D(Conv2DTranspose):
+	def get_output_shape_for_(self):
+		pass
+
+def deconv2d(tensor, n_feature, kernel_shape, strides=(1, 1), padding='valid'):
+	ret = UpSampling2D(strides)(tensor)
+	ret = Conv2D(n_feature, kernel_shape, padding=padding)(ret)
+	return ret
 
 
 def build_resnet_block(i_res, dim, name="resnet", res_layer_num=2):

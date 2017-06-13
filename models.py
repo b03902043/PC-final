@@ -43,15 +43,16 @@ class Generator:
 
 	def build_model(self, needSum = True):
 		input_gen = Input(shape=self.img_size)
+		print ('input shape : ' + str(input_gen.get_shape()))
 		nn = Conv2D(self.nf, (7, 7), strides=(1, 1), padding='same')(input_gen)
 		nn = InstanceNormalization2D()(nn)
-		nn = Activation('relu')
+		nn = Activation('relu')(nn)
 		nn = Conv2D(self.nf*2, (3, 3), strides=(2, 2), padding='same')(nn)
 		nn = InstanceNormalization2D()(nn)
-		nn = Activation('relu')
+		nn = Activation('relu')(nn)
 		nn = Conv2D(self.nf*4, (3, 3), strides=(2, 2), padding='same')(nn)
 		nn = InstanceNormalization2D()(nn)
-		nn = Activation('relu')
+		nn = Activation('relu')(nn)
 
 		# transform
 		nn = build_resnet_block(nn, 64*4)
@@ -61,13 +62,23 @@ class Generator:
 		nn = build_resnet_block(nn, 64*4)
 		nn = build_resnet_block(nn, 64*4)
 
+		# print ('shape: ' + str(K.shape(nn)))
+
+		# iss = nn.get_shape()
+		# print (iss)
+
+
 		# decoding
-		nn = Conv2DTranspose(self.nf*2, (3, 3), strides=(2, 2), padding='same')(nn)
+		# nn = Conv2DTranspose(self.nf*2, (3, 3), strides=(2, 2), padding='same')(nn)
+		nn = deconv2d(nn, self.nf*2, (3, 3), strides=(2, 2), padding='same')
+		# print ('shape: ' + str(nn.get_shape()))
 		nn = InstanceNormalization2D()(nn)
-		nn = Activation('relu')
-		nn = Conv2DTranspose(self.nf, (3, 3), strides=(2, 2), padding='same')(nn)
+		nn = Activation('relu')(nn)
+		# nn = Conv2DTranspose(self.nf, (3, 3), strides=(2, 2), padding='same')(nn)
+		nn = deconv2d(nn, self.nf, (3, 3), strides=(2, 2), padding='same')
+		# print ('shape: ' + str(nn.get_shape()))
 		nn = InstanceNormalization2D()(nn)
-		nn = Activation('relu')
+		nn = Activation('relu')(nn)
 		gen = Conv2D(3, (7, 7), activation='tanh', strides=(1, 1), padding='same')(nn)
 		
 		generator = Model(inputs=input_gen, outputs=gen)
