@@ -14,9 +14,9 @@ output_folder = 'output'
 if not os.path.isdir(output_folder):
 	os.makedirs(output_folder)
 
-cycle_gan = CycleGAN(shape = (128, 128, 3))
+cycle_gan = CycleGAN(shape=(128, 128, 3), bch_img_num=10)
 try:
-	cycle_gan.fit(epoch_num=200, disc_iter = 1, save_period = 1, pic_dir = output_folder)
+	cycle_gan.fit(epoch_num=200, disc_iter=5, save_period=1, pic_dir=output_folder)
 except KeyboardInterrupt:
 	K.clear_session()
 	try:

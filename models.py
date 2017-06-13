@@ -119,8 +119,8 @@ class Generator:
 	def save(self, path):
 		self.model.save_weights(path)
 
-	def load(self, path):
-		self.model.load_model(path)
+	def load(self, path, **kwargs):
+		self.model.load_weights(path, **kwargs)
 
 class Discriminator:
 	def __init__(self, num_features=64, im_shape = (256, 256, 3), name='discriminator', Cmodel = None):
@@ -190,24 +190,24 @@ class Discriminator:
 	def save(self, path):
 		self.model.save_weights(path)
 
-	def load(self, path):
-		self.model.load_model(path)
+	def load(self, path, **kwargs):
+		self.model.load_weights(path, **kwargs)
 
 class CycleGAN:
 
-	def __init__(self, shape = (256, 256, 3)):
+	def __init__(self, shape = (256, 256, 3), bch_img_num = 10):
 		# print 'Init CycleGAN'
 		self.shp = shape
 		self.gopt = Adam(lr=0.0002, beta_1=0.5, beta_2=0.999)
 		self.dopt = Adam(lr=0.0002, beta_1=0.5, beta_2=0.999)
 		self.fake_images_A, self.fake_num_A = np.zeros((pool_size, ) + shape), 0
 		self.fake_images_B, self.fake_num_B = np.zeros((pool_size, ) + shape), 0
+		self.batch_img_num = bch_img_num
 		self.setup_model()
 
 	def collect_images(self, A = None, B = None):
-		self.batch_img_num = 10
-		self.inputA = randReadImg('A', self.batch_img_num, shp = self.shp)
-		self.inputB = randReadImg('B', self.batch_img_num, shp = self.shp)
+		self.inputA = randReadImg('A', self.batch_img_num, shp = self.shp) / 127.5 - 1
+		self.inputB = randReadImg('B', self.batch_img_num, shp = self.shp) / 127.5 - 1
 
 	'''
 		The function setup the model for training
@@ -223,10 +223,10 @@ class CycleGAN:
 		self.clf_A = Discriminator(name='clf_A', im_shape=self.shp)	# clf input0 = real, input1 = fake
 		self.clf_B = Discriminator(name='clf_B', im_shape=self.shp)
 
-		init_network(self.genA.model)
-		init_network(self.genB.model)
-		init_network(self.clf_A.model)
-		init_network(self.clf_B.model)
+		self.genA.model = init_network(self.genA.model)
+		self.genB.model = init_network(self.genB.model)
+		self.clf_A.model = init_network(self.clf_A.model)
+		self.clf_B.model = init_network(self.clf_B.model)
 
 		self.realA, self.realB = Input(self.shp), Input(self.shp)
 		self.fakeA, self.fakeB = self.genA.model(self.realB), self.genB.model(self.realA)
@@ -262,8 +262,8 @@ class CycleGAN:
 			[clf_realA, clf_fakeA, clf_realB, clf_fakeB])
 		self.trainnerD.compile(optimizer=self.dopt, loss='MSE')
 
-		plot_model(self.trainnerG, to_file=os.path.join('output/trainnerG.png'))
-		plot_model(self.trainnerD, to_file=os.path.join('output/trainnerD.png'))
+		plot_model(self.trainnerG, to_file=os.path.join('output/trainnerG.png'), show_shapes=True)
+		plot_model(self.trainnerD, to_file=os.path.join('output/trainnerD.png'), show_shapes=True)
 
 	def fit(self, epoch_num = 10, disc_iter = 10, save_period = 1, pic_dir = None):
 		for i in range(epoch_num):
@@ -276,6 +276,10 @@ class CycleGAN:
 			ones  = np.ones((self.batch_img_num,) + self.trainnerG.output_shape[0][1:])
 			zeros = np.zeros((self.batch_img_num, ) + self.trainnerG.output_shape[0][1:])
 
+			# change learning rate
+			self.UpdateOptimizerLR(i+1, [self.trainnerG, self.trainnerD])
+
+			print ('Training discriminator')
 			# train discriminator
 			for _ in range(disc_iter):
 				_, rA_dloss, fA_dloss, rB_dloss, fB_dloss = self.trainnerD.train_on_batch([self.inputA, A_fake, self.inputB, B_fake],
@@ -284,11 +288,10 @@ class CycleGAN:
 			# train generator
 			# Target "zero" represent the classifier assume A -gen-> B -clf-> B (100%)
 			# That is, generator can cheat clf
+			print ('Training generator')
 			_, rA_gloss, fA_gloss, rB_gloss, fB_gloss = self.trainnerG.train_on_batch([self.inputA, self.inputB],
 				[zeros, self.inputA, zeros, self.inputB])	
 			
-			print ('clf A, clf B, ')
-
 			print ('Generator Loss:')
 			print ('Real A: {}, Fake A: {}, Real B: {}, Fake B: {}'.format(rA_gloss, fA_gloss, rB_gloss, fB_gloss))
 
@@ -302,10 +305,10 @@ class CycleGAN:
 
 			if (i+1) % save_period == 0 and pic_dir is not None:
 
-				ImageA = self.inputA / 256.0 # N * W * W * l
+				ImageA = self.inputA  # N * W * W * l
 				ImageA2B = self.genB.predict(self.inputA)
 				ImageA2B2A = self.genA.predict(ImageA2B)
-				ImageB = self.inputB / 256.0 # 1 * N * W * W * l
+				ImageB = self.inputB  # 1 * N * W * W * l
 				ImageB2A = self.genA.predict(self.inputB)
 				ImageB2A2B = self.genB.predict(ImageB2A)
 
@@ -317,14 +320,14 @@ class CycleGAN:
 				np.save(os.path.join(pic_dir, 'ia2b'+str(i)), ImageA2B)
 				np.save(os.path.join(pic_dir, 'ib2a'+str(i)), ImageB2A)
 
-				Imgs = np.r_[ ImageA, ImageA2B, ImageA2B2A, ImageB, ImageB2A, ImageB2A2B ]
+				Imgs = ( np.r_[ ImageA, ImageA2B, ImageA2B2A, ImageB, ImageB2A, ImageB2A2B ] + 1 ) * 0.5
 
 				saveImg(Imgs, sub_w = len(ImageA), path = os.path.join(pic_dir, '{}.jpg'.format(i)))
 
-				self.genB.save(os.path.join(pic_dir, 'a2b.h5'))
-				self.genA.save(os.path.join(pic_dir, 'b2a.h5'))
-				self.clf_A.save(os.path.join(pic_dir, 'clfA.h5'))
-				self.clf_B.save(os.path.join(pic_dir, 'clfB.h5'))
+				# self.genB.save(os.path.join(pic_dir, 'a2b.h5'))
+				# self.genA.save(os.path.join(pic_dir, 'b2a.h5'))
+				# self.clf_A.save(os.path.join(pic_dir, 'clfA.h5'))
+				# self.clf_B.save(os.path.join(pic_dir, 'clfB.h5'))
 
 			self.fake_num_A += self.batch_img_num
 			self.fake_num_B += self.batch_img_num
@@ -340,9 +343,21 @@ class CycleGAN:
 			fake_pool = np.roll(fake_pool, -overfull_num)
 			ret_images = fake_pool[-len(new_fakes):].copy()	# this part can be random swap-in return images
 			fake_pool[-len(new_fakes):] = new_fakes
+			return fake_pool[np.random.choice(pool_size, size=len(new_fakes), replace=False)]
 		else:
 			fake_pool[num_fakes : num_fakes + len(new_fakes)] = new_fakes
 
-		return fake_pool[np.random.choice(num_fakes - overfull_num, size=len(new_fakes), replace=False)]
+		return new_fakes
+		
+	def UpdateOptimizerLR(self, ep, mds):
+		lr_base = 0.0002
+		if ep > 200:
+			lr_base = 0
+		elif ep > 100:
+			lr_base *= (200-ep)/100.0
+		else:
+			return 
 
+		for md in mds:
+			K.set_value(md.optimizer.lr, lr_base)
 
