@@ -239,18 +239,19 @@ class CycleGAN:
 			loss=['MSE', 'MAE', 'MSE', 'MAE'], 
 			loss_weights=[1, lambda_gan, 1, lambda_gan])
 
-		self.fakeA, self.fakeB = Input(self.shp), Input(self.shp)
+		realA, realB = Input(self.shp), Input(self.shp)
+		fakeA, fakeB = Input(self.shp), Input(self.shp)
 
-		clf_fakeA = self.clf_A.model(self.fakeA)
-		clf_fakeB = self.clf_B.model(self.fakeB)
-		clf_realA = self.clf_A.model(self.realA)
-		clf_realB = self.clf_B.model(self.realB)
+		clf_fakeA = self.clf_A.model(fakeA)
+		clf_fakeB = self.clf_B.model(fakeB)
+		clf_realA = self.clf_A.model(realA)
+		clf_realB = self.clf_B.model(realB)
 
 		# self.real_A, self.real_B, self.fake_A, self.fake_B = Input(self.shp), Input(self.shp), Input(self.shp), Input(self.shp)
 		# self.clf_real_A, self.clf_real_B, self.clf_fake_A, self.clf_fake_B = self.clf_A.model(self.real_A),	\
 		# 	self.clf_B.model(self.real_B), self.clf_A.model(self.fake_A), self.clf_B.model(self.fake_B)
 
-		self.trainnerD = Model([ self.realA, self.fakeA, self.realB, self.fakeB ], 
+		self.trainnerD = Model([ realA, fakeA, realB, fakeB ], 
 			[clf_realA, clf_fakeA, clf_realB, clf_fakeB])
 		self.trainnerD.compile(optimizer=self.dopt, loss='MSE')
 
@@ -259,15 +260,15 @@ class CycleGAN:
 			print ('Epoch {}'.format(i+1))
 			self.collect_images()
 
-			self.A_fake = self.update_fake_pool(self.fake_images_A, self.genA.predict(self.inputB), self.fake_num_A)
-			self.B_fake = self.update_fake_pool(self.fake_images_B, self.genB.predict(self.inputA), self.fake_num_B)
+			A_fake = self.update_fake_pool(self.fake_images_A, self.genA.predict(self.inputB), self.fake_num_A)
+			B_fake = self.update_fake_pool(self.fake_images_B, self.genB.predict(self.inputA), self.fake_num_B)
 
 			ones  = np.ones((self.batch_img_num,) + self.trainnerG.output_shape[0][1:])
 			zeros = np.zeros((self.batch_img_num, ) + self.trainnerG.output_shape[0][1:])
 
 			# train discriminator
 			for _ in range(disc_iter):
-				_, rA_dloss, fA_dloss, rB_dloss, fB_dloss = self.trainnerD.train_on_batch([self.inputA, self.A_fake, self.inputB, self.B_fake],
+				_, rA_dloss, fA_dloss, rB_dloss, fB_dloss = self.trainnerD.train_on_batch([self.inputA, A_fake, self.inputB, B_fake],
 					[zeros, ones * 0.9, zeros, ones * 0.9])	# label given (assign real=0, fake=0.9)
 
 			# train generator
@@ -276,6 +277,8 @@ class CycleGAN:
 			_, rA_gloss, fA_gloss, rB_gloss, fB_gloss = self.trainnerG.train_on_batch([self.inputA, self.inputB],
 				[zeros, self.inputA, zeros, self.inputB])	
 			
+			print ('clf A, clf B, ')
+
 			print ('Generator Loss:')
 			print ('Real A: {}, Fake A: {}, Real B: {}, Fake B: {}'.format(rA_gloss, fA_gloss, rB_gloss, fB_gloss))
 
@@ -283,7 +286,7 @@ class CycleGAN:
 			print ('Real A: {}, Fake A: {}, Real B: {}, Fake B: {}'.format(rA_dloss, fA_dloss, rB_dloss, fB_dloss))
 
 			print ('Discriminator A (accuracy) : real({}), fake({})'.format(
-				self.clf_A.predict(self.inputA).mean(), self.clf_A.predict(self.A_fake).mean()))
+				self.clf_A.predict(self.inputA).mean(), self.clf_A.predict(A_fake).mean()))
 
 			sys.stdout.flush()
 
@@ -310,6 +313,10 @@ class CycleGAN:
 
 				self.genB.save(os.path.join(pic_dir, 'a2b.h5'))
 				self.genA.save(os.path.join(pic_dir, 'b2a.h5'))
+				simple_save('genA.pkl', self.genA)
+				simple_save('genB.pkl', self.genB)
+				simple_save('clfA.pkl', self.clf_A)
+				simple_save('clfB.pkl', self.clf_B)
 
 			self.fake_num_A += self.batch_img_num
 			self.fake_num_B += self.batch_img_num
