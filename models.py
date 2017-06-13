@@ -262,6 +262,9 @@ class CycleGAN:
 			[clf_realA, clf_fakeA, clf_realB, clf_fakeB])
 		self.trainnerD.compile(optimizer=self.dopt, loss='MSE')
 
+		plot_model(self.trainnerG, to_file=os.path.join('output/trainnerG.png'))
+		plot_model(self.trainnerD, to_file=os.path.join('output/trainnerD.png'))
+
 	def fit(self, epoch_num = 10, disc_iter = 10, save_period = 1, pic_dir = None):
 		for i in range(epoch_num):
 			print ('Epoch {}'.format(i+1))
