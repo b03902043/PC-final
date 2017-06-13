@@ -43,12 +43,15 @@ class Generator:
 
 	def build_model(self, needSum = True):
 		input_gen = Input(shape=self.img_size)
-		nn = Conv2D(self.nf, (7, 7), activation='relu', strides=(1, 1), padding='same')(input_gen)
-		nn = BatchNormalization()(nn)
-		nn = Conv2D(self.nf*2, (3, 3), activation='relu', strides=(2, 2), padding='same')(nn)
-		nn = BatchNormalization()(nn)
-		nn = Conv2D(self.nf*4, (3, 3), activation='relu', strides=(2, 2), padding='same')(nn)
-		nn = BatchNormalization()(nn)
+		nn = Conv2D(self.nf, (7, 7), strides=(1, 1), padding='same')(input_gen)
+		nn = InstanceNormalization2D()(nn)
+		nn = Activation('relu')
+		nn = Conv2D(self.nf*2, (3, 3), strides=(2, 2), padding='same')(nn)
+		nn = InstanceNormalization2D()(nn)
+		nn = Activation('relu')
+		nn = Conv2D(self.nf*4, (3, 3), strides=(2, 2), padding='same')(nn)
+		nn = InstanceNormalization2D()(nn)
+		nn = Activation('relu')
 
 		# transform
 		nn = build_resnet_block(nn, 64*4)
@@ -59,12 +62,13 @@ class Generator:
 		nn = build_resnet_block(nn, 64*4)
 
 		# decoding
-		nn = Conv2DTranspose(self.nf*2, (3, 3), activation='relu', strides=(2, 2), padding='same')(nn)
-		nn = BatchNormalization()(nn)
-		nn = Conv2DTranspose(self.nf, (3, 3), activation='relu', strides=(2, 2), padding='same')(nn)
-		nn = BatchNormalization()(nn)
-		nn = Conv2D(3, (7, 7), activation='relu', strides=(1, 1), padding='same')(nn)
-		gen = BatchNormalization()(nn)
+		nn = Conv2DTranspose(self.nf*2, (3, 3), strides=(2, 2), padding='same')(nn)
+		nn = InstanceNormalization2D()(nn)
+		nn = Activation('relu')
+		nn = Conv2DTranspose(self.nf, (3, 3), strides=(2, 2), padding='same')(nn)
+		nn = InstanceNormalization2D()(nn)
+		nn = Activation('relu')
+		gen = Conv2D(3, (7, 7), activation='tanh', strides=(1, 1), padding='same')(nn)
 		
 		generator = Model(inputs=input_gen, outputs=gen)
 		# generator.compile(loss='binary_crossentropy', optimizer=adam)
@@ -107,15 +111,15 @@ class Discriminator:
 		nn = Conv2D(self.nf*2, (filter_w, filter_w), strides=(2, 2), padding='same',
 			kernel_initializer=TruncatedNormal(stddev=0.02), bias_initializer=Constant(0.0))(nn)
 		nn = LeakyReLU(0.2)(nn)
-		nn = BatchNormalization()(nn)
+		nn = InstanceNormalization2D()(nn)
 		nn = Conv2D(self.nf*4, (filter_w, filter_w), strides=(2, 2), padding='same',
 			kernel_initializer=TruncatedNormal(stddev=0.02), bias_initializer=Constant(0.0))(nn)
 		nn = LeakyReLU(0.2)(nn)
-		nn = BatchNormalization()(nn)
+		nn = InstanceNormalization2D()(nn)
 		nn = Conv2D(self.nf*8, (filter_w, filter_w), strides=(1, 1), padding='same',
 			kernel_initializer=TruncatedNormal(stddev=0.02), bias_initializer=Constant(0.0))(nn)
 		nn = LeakyReLU(0.2)(nn)
-		nn = BatchNormalization()(nn)
+		nn = InstanceNormalization2D()(nn)
 		dis = Conv2D(1, (filter_w, filter_w), strides=(1, 1), padding='same',
 			kernel_initializer=TruncatedNormal(stddev=0.02), bias_initializer=Constant(0.0))(nn)
 		discriminator = Model(inputs=input_dis, outputs=dis)

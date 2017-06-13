@@ -26,6 +26,41 @@ else:
 
 import matplotlib.pyplot as plt
 
+from keras.engine.topology import Layer
+
+class InstanceNormalization2D(Layer):
+	''' Thanks for github.com/jayanthkoushik/neural-style '''
+	def __init__(self, **kwargs):
+		super(InstanceNormalization2D, self).__init__(**kwargs)
+
+	def build(self, input_shape):
+		self.scale = self.add_weight(name='scale', shape=(input_shape[1],), initializer="one", trainable=True)
+		self.shift = self.add_weight(name='shift', shape=(input_shape[1],), initializer="zero", trainable=True)
+		super(InstanceNormalization2D, self).build(input_shape)
+
+	def call(self, x, mask=None):
+		def image_expand(tensor):
+			return K.expand_dims(K.expand_dims(tensor, -1), -1)
+
+		def batch_image_expand(tensor):
+			return image_expand(K.expand_dims(tensor, 0))
+
+		hw = K.cast(x.shape[2] * x.shape[3], K.floatx())
+		mu = K.sum(x, [-1, -2]) / hw
+		mu_vec = image_expand(mu) 
+		sig2 = K.sum(K.square(x - mu_vec), [-1, -2]) / hw
+		y = (x - mu_vec) / (K.sqrt(image_expand(sig2)) + K.epsilon())
+
+		scale = batch_image_expand(self.scale)
+		shift = batch_image_expand(self.shift)
+		return scale*y + shift 
+#	   else:
+#		   raise NotImplemented("Please complete `CycGAN/layers/padding.py` to run on backend {}.".format(K.backend()))
+
+	def compute_output_shape(self, input_shape):
+		return input_shape 
+
+
 def build_resnet_block(i_res, dim, name="resnet", res_layer_num=2):
 	res_out = Conv2D(dim, (3, 3), activation='relu', strides=(1, 1), padding='same', 
 		kernel_initializer=TruncatedNormal(stddev=0.02), bias_initializer=Constant(0.0))(i_res)
@@ -65,6 +100,7 @@ def saveImg(imgs, sub_w = 5, path = None):
 			ax.set_axis_off()
 			ax.imshow(imgs[i])
 		plt.savefig(path)
+		plt.clf()
 
 def simple_save(path, obj):
 	with open(path, 'wb') as f:
