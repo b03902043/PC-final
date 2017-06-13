@@ -199,8 +199,8 @@ class CycleGAN:
 
 	def collect_images(self, A = None, B = None):
 		self.batch_img_num = 10
-		self.inputA = randReadImg('A', self.batch_img_num, wid = self.shp[0])
-		self.inputB = randReadImg('B', self.batch_img_num, wid = self.shp[0])
+		self.inputA = randReadImg('A', self.batch_img_num, shp = self.shp)
+		self.inputB = randReadImg('B', self.batch_img_num, shp = self.shp)
 
 	'''
 		The function setup the model for training
@@ -234,24 +234,24 @@ class CycleGAN:
 		# self.cyc_A.summary()
 		# self.cyc_A.compile(optimizer=opt)
 		self.trainnerG = Model([ self.realA, self.realB ],
-			[self.clf_genB, self.clf_genA, self.cyc_A, self.cyc_B])
+			[self.clf_genA, self.cyc_A, self.clf_genB, self.cyc_B])
 		self.trainnerG.compile(optimizer=self.gopt, 
-			loss=['MSE', 'MSE', 'MAE', 'MAE'], 
-			loss_weights=[1, 1, lambda_gan, lambda_gan])
+			loss=['MSE', 'MAE', 'MSE', 'MAE'], 
+			loss_weights=[1, lambda_gan, 1, lambda_gan])
 
 		self.fakeA, self.fakeB = Input(self.shp), Input(self.shp)
 
-		self.clf_genA = self.clf_A.model(self.fakeA)
-		self.clf_genB = self.clf_B.model(self.fakeB)
-		self.clf_realA = self.clf_A.model(self.realA)
-		self.clf_realB = self.clf_B.model(self.realB)
+		clf_fakeA = self.clf_A.model(self.fakeA)
+		clf_fakeB = self.clf_B.model(self.fakeB)
+		clf_realA = self.clf_A.model(self.realA)
+		clf_realB = self.clf_B.model(self.realB)
 
 		# self.real_A, self.real_B, self.fake_A, self.fake_B = Input(self.shp), Input(self.shp), Input(self.shp), Input(self.shp)
 		# self.clf_real_A, self.clf_real_B, self.clf_fake_A, self.clf_fake_B = self.clf_A.model(self.real_A),	\
 		# 	self.clf_B.model(self.real_B), self.clf_A.model(self.fake_A), self.clf_B.model(self.fake_B)
 
 		self.trainnerD = Model([ self.realA, self.fakeA, self.realB, self.fakeB ], 
-			[self.clf_realA, self.clf_genA, self.clf_realB, self.clf_genB])
+			[clf_realA, clf_fakeA, clf_realB, clf_fakeB])
 		self.trainnerD.compile(optimizer=self.dopt, loss='MSE')
 
 	def fit(self, epoch_num = 10, disc_iter = 10, save_period = 1, pic_dir = None):
@@ -274,7 +274,7 @@ class CycleGAN:
 			# Target "zero" represent the classifier assume A -gen-> B -clf-> B (100%)
 			# That is, generator can cheat clf
 			_, rA_gloss, fA_gloss, rB_gloss, fB_gloss = self.trainnerG.train_on_batch([self.inputA, self.inputB],
-				[zeros, zeros, self.inputA, self.inputB])	
+				[zeros, self.inputA, zeros, self.inputB])	
 			
 			print ('Generator Loss:')
 			print ('Real A: {}, Fake A: {}, Real B: {}, Fake B: {}'.format(rA_gloss, fA_gloss, rB_gloss, fB_gloss))
@@ -283,7 +283,7 @@ class CycleGAN:
 			print ('Real A: {}, Fake A: {}, Real B: {}, Fake B: {}'.format(rA_dloss, fA_dloss, rB_dloss, fB_dloss))
 
 			print ('Discriminator A (accuracy) : real({}), fake({})'.format(
-				self.clf_A.predict(self.inputA).mean(), self.clf_A.predict(A_fake).mean()))
+				self.clf_A.predict(self.inputA).mean(), self.clf_A.predict(self.A_fake).mean()))
 
 			sys.stdout.flush()
 

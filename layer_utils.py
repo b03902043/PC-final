@@ -9,6 +9,7 @@ import keras.backend as K
 from keras.initializers import TruncatedNormal, Constant
 import os, pickle
 import numpy as np
+import PIL
 from PIL import Image
 import matplotlib as mpl
 try:
@@ -91,7 +92,7 @@ def sharpen(data):
 		data = data.reshape((1, ) + data.shape)
 	return data
 
-def randReadImg(tag, num, shp=(256, 256, 3), printName=False, wid=128):
+def randReadImg(tag, num, shp=(256, 256, 3), printName=False):
 	fo = 'input/apple2orange/train{}'.format(tag)
 	fs = [f for f in os.listdir(fo) if os.path.isfile(os.path.join(fo, f))]
 	ret = np.zeros(shape=((num, ) + shp))
@@ -100,7 +101,7 @@ def randReadImg(tag, num, shp=(256, 256, 3), printName=False, wid=128):
 		if printName:
 			print (fs[rd])
 		img = Image.open(os.path.join(fo, fs[rd]))
-		img = img.resize((wid, wid), PIL.Image.ANTIALIAS)
+		img = img.resize((shp[0], shp[1]), PIL.Image.ANTIALIAS)
 		ret[_] = np.asarray(img)
 	return ret
 
