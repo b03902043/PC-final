@@ -46,9 +46,9 @@ def init_network(model):
 
 class Generator:
 
-	def __init__(self, num_features=64, img_w=256, img_h=256, img_l=3, name='generator', Cmodel = None):
+	def __init__(self, num_features=64, im_shape = (256, 256, 3), name='generator', Cmodel = None):
 		self.nf = num_features
-		self.img_size = (img_w, img_h, img_l)
+		self.img_size = im_shape
 		self.name = name
 		self.input_num = 0	# input_num
 		self.model = self.build_model() if Cmodel is None else Cmodel
@@ -119,9 +119,9 @@ class Generator:
 		self.model.save_weights(path)
 
 class Discriminator:
-	def __init__(self, num_features=64, img_w=256, img_h=256, img_l=3, name='discriminator', Cmodel = None):
+	def __init__(self, num_features=64, im_shape = (256, 256, 3), name='discriminator', Cmodel = None):
 		self.nf = num_features
-		self.img_size = (img_w, img_h, img_l)
+		self.img_size = im_shape
 		self.name = name
 		self.input_num = 0	# input_num
 		self.model = self.build_model() if Cmodel is None else Cmodel
@@ -199,8 +199,8 @@ class CycleGAN:
 
 	def collect_images(self, A = None, B = None):
 		self.batch_img_num = 10
-		self.inputA = randReadImg('A', self.batch_img_num)
-		self.inputB = randReadImg('B', self.batch_img_num)
+		self.inputA = randReadImg('A', self.batch_img_num, wid = self.shp[0])
+		self.inputB = randReadImg('B', self.batch_img_num, wid = self.shp[0])
 
 	'''
 		The function setup the model for training
@@ -211,10 +211,10 @@ class CycleGAN:
 		# if not hasattr(self, 'inputA') or not hasattr(self, 'inputB'):
 		# 	raise Exception('Input must be assigned before setup model')
 
-		self.genB = Generator(name='GenA2B')
-		self.genA = Generator(name='GenB2A')
-		self.clf_A = Discriminator(name='clf_A')	# clf input0 = real, input1 = fake
-		self.clf_B = Discriminator(name='clf_B')
+		self.genB = Generator(name='GenA2B', im_shape=self.shp)
+		self.genA = Generator(name='GenB2A', im_shape=self.shp)
+		self.clf_A = Discriminator(name='clf_A', im_shape=self.shp)	# clf input0 = real, input1 = fake
+		self.clf_B = Discriminator(name='clf_B', im_shape=self.shp)
 
 		init_network(self.genA.model)
 		init_network(self.genB.model)
