@@ -244,10 +244,10 @@ class CycleGAN:
 
 			if (i+1) % save_period == 0 and pic_dir is not None:
 
-				ImageA = self.inputA # N * W * W * l
+				ImageA = self.inputA / 256.0 # N * W * W * l
 				ImageA2B = self.genB.predict(self.inputA)
 				ImageA2B2A = self.genA.predict(ImageA2B)
-				ImageB = self.inputB # 1 * N * W * W * l
+				ImageB = self.inputB / 256.0 # 1 * N * W * W * l
 				ImageB2A = self.genA.predict(self.inputB)
 				ImageB2A2B = self.genB.predict(ImageB2A)
 
@@ -259,7 +259,7 @@ class CycleGAN:
 				np.save('ia2b'+str(i), ImageA2B)
 				np.save('ib2a'+str(i), ImageB2A)
 
-				Imgs = np.r_[ ImageA, ImageA2B, ImageA2B2A, ImageB, ImageB2A, ImageB2A2B ] / 256
+				Imgs = np.r_[ ImageA, ImageA2B, ImageA2B2A, ImageB, ImageB2A, ImageB2A2B ]
 
 				saveImg(Imgs, sub_w = len(ImageA), path = os.path.join(pic_dir, '{}.jpg'.format(i)))
 
