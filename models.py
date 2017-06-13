@@ -16,6 +16,7 @@ import numpy as np
 import tensorflow as tf
 import pickle as pkl
 import os, sys
+from keras.models import load_model
 
 from layer_utils import *
 
@@ -118,6 +119,9 @@ class Generator:
 	def save(self, path):
 		self.model.save_weights(path)
 
+	def load(self, path):
+		self.model.load_model(path)
+
 class Discriminator:
 	def __init__(self, num_features=64, im_shape = (256, 256, 3), name='discriminator', Cmodel = None):
 		self.nf = num_features
@@ -185,6 +189,9 @@ class Discriminator:
 
 	def save(self, path):
 		self.model.save_weights(path)
+
+	def load(self, path):
+		self.model.load_model(path)
 
 class CycleGAN:
 
@@ -304,8 +311,8 @@ class CycleGAN:
 				ImageB2A = sharpen(ImageB2A)
 				ImageB2A2B = sharpen(ImageB2A2B)
 
-				np.save('ia2b'+str(i), ImageA2B)
-				np.save('ib2a'+str(i), ImageB2A)
+				np.save(os.path.join(pic_dir, 'ia2b'+str(i)), ImageA2B)
+				np.save(os.path.join(pic_dir, 'ib2a'+str(i)), ImageB2A)
 
 				Imgs = np.r_[ ImageA, ImageA2B, ImageA2B2A, ImageB, ImageB2A, ImageB2A2B ]
 
@@ -313,10 +320,8 @@ class CycleGAN:
 
 				self.genB.save(os.path.join(pic_dir, 'a2b.h5'))
 				self.genA.save(os.path.join(pic_dir, 'b2a.h5'))
-				simple_save('genA.pkl', self.genA)
-				simple_save('genB.pkl', self.genB)
-				simple_save('clfA.pkl', self.clf_A)
-				simple_save('clfB.pkl', self.clf_B)
+				self.clf_A.save(os.path.join(pic_dir, 'clfA.h5'))
+				self.clf_B.save(os.path.join(pic_dir, 'clfB.h5'))
 
 			self.fake_num_A += self.batch_img_num
 			self.fake_num_B += self.batch_img_num
