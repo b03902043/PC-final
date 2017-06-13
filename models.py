@@ -199,7 +199,7 @@ class CycleGAN:
 			[self.clf_genB.output, self.clf_genA.output, self.cyc_A.output, self.cyc_B.output])
 		self.trainnerG.compile(optimizer=self.gopt, 
 			loss=['MSE', 'MSE', 'MAE', 'MAE'], 
-			loss_weight=[1, 1, lambda_gan, lambda_gan])
+			loss_weights=[1, 1, lambda_gan, lambda_gan])
 
 		self.real_A, self.real_B, self.fake_A, self.fake_B = Input(self.shp), Input(self.shp), Input(self.shp), Input(self.shp)
 		self.clf_real_A, self.clf_real_B, self.clf_fake_A, self.clf_fake_B = self.clf_A.model(self.real_A),	\
