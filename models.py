@@ -1,6 +1,6 @@
 from keras.models import Model, Sequential, model_from_json
 from keras.layers import Input, Flatten, Dropout, Embedding, Dense, Activation, Merge
-from keras.layers.convolutional import Conv2D, Conv2DTranspose
+from keras.layers.convolutional import Conv2D, Conv2DTranspose, ZeroPadding2D
 from keras.layers.core import Dense, Dropout, Activation, Reshape
 from keras.layers.pooling import MaxPooling2D
 from keras.layers.merge import Add, Concatenate, Dot
@@ -38,12 +38,12 @@ class Generator:
 	def __init__(self, num_features=64, img_w=256, img_h=256, img_l=3, name='generator'):
 		self.nf = num_features
 		self.img_size = (img_w, img_h, img_l)
-		self.model = self.build_model(needSum=False)
 		self.name = name
+		self.model = self.build_model(needSum=False)
 
 	def build_model(self, needSum = True):
 		input_gen = Input(shape=self.img_size)
-		print ('input shape : ' + str(input_gen.get_shape()))
+		# print ('input shape : ' + str(input_gen.get_shape()))
 		nn = Conv2D(self.nf, (7, 7), strides=(1, 1), padding='same')(input_gen)
 		nn = InstanceNormalization2D()(nn)
 		nn = Activation('relu')(nn)
@@ -55,34 +55,28 @@ class Generator:
 		nn = Activation('relu')(nn)
 
 		# transform
-		nn = build_resnet_block(nn, 64*4)
-		nn = build_resnet_block(nn, 64*4)
-		nn = build_resnet_block(nn, 64*4)
-		nn = build_resnet_block(nn, 64*4)
-		nn = build_resnet_block(nn, 64*4)
-		nn = build_resnet_block(nn, 64*4)
-
-		# print ('shape: ' + str(K.shape(nn)))
-
-		# iss = nn.get_shape()
-		# print (iss)
+		nn = build_resnet_block(nn, self.nf*4)
+		nn = build_resnet_block(nn, self.nf*4)
+		nn = build_resnet_block(nn, self.nf*4)
+		nn = build_resnet_block(nn, self.nf*4)
+		nn = build_resnet_block(nn, self.nf*4)
+		nn = build_resnet_block(nn, self.nf*4)
 
 
 		# decoding
 		# nn = Conv2DTranspose(self.nf*2, (3, 3), strides=(2, 2), padding='same')(nn)
 		nn = deconv2d(nn, self.nf*2, (3, 3), strides=(2, 2), padding='same')
-		# print ('shape: ' + str(nn.get_shape()))
 		nn = InstanceNormalization2D()(nn)
 		nn = Activation('relu')(nn)
 		# nn = Conv2DTranspose(self.nf, (3, 3), strides=(2, 2), padding='same')(nn)
 		nn = deconv2d(nn, self.nf, (3, 3), strides=(2, 2), padding='same')
-		# print ('shape: ' + str(nn.get_shape()))
 		nn = InstanceNormalization2D()(nn)
 		nn = Activation('relu')(nn)
-		gen = Conv2D(3, (7, 7), activation='tanh', strides=(1, 1), padding='same')(nn)
+
+		nn = ZeroPadding2D((3, 3))(nn)
+		gen = Conv2D(3, (7, 7), activation='tanh', strides=(1, 1), padding='valid')(nn)
 		
-		generator = Model(inputs=input_gen, outputs=gen)
-		# generator.compile(loss='binary_crossentropy', optimizer=adam)
+		generator = Model(inputs=input_gen, outputs=gen, name=self.name)
 		if needSum:
 			generator.summary()
 		# plot_model(generator, to_file='gen.png')
@@ -94,8 +88,8 @@ class Generator:
 			raise 'In {}, argument \"next_model\" does not have model attribute '.format(self.__class__.__name__)
 		return Model(inputs=self.model.input, outputs=next_networks.model(self.model.output))
 
-	def predict(self, **kwargs):
-		return self.model.predict(**kwargs)
+	def predict(self, X):
+		return self.model.predict(X)
 
 	def fit(self, **kwargs):
 		return self.model.fit(**kwargs)
@@ -110,10 +104,10 @@ class Discriminator:
 	def __init__(self, num_features=64, img_w=256, img_h=256, img_l=3, name='discriminator'):
 		self.nf = num_features
 		self.img_size = (img_w, img_h, img_l)
-		self.model = self.build_model(needSum=False)
 		self.name = name
+		self.model = self.build_model(needSum=False)
 
-	def build_model(self, needSum = True):
+	def build_model(self, needSum = True, needSigmoid = False):
 		filter_w = 4
 		input_dis = Input(shape=self.img_size)
 		nn = Conv2D(self.nf, (filter_w, filter_w), strides=(2, 2), padding='same',
@@ -121,19 +115,26 @@ class Discriminator:
 		nn = LeakyReLU(0.2)(nn)
 		nn = Conv2D(self.nf*2, (filter_w, filter_w), strides=(2, 2), padding='same',
 			kernel_initializer=TruncatedNormal(stddev=0.02), bias_initializer=Constant(0.0))(nn)
-		nn = LeakyReLU(0.2)(nn)
 		nn = InstanceNormalization2D()(nn)
+		nn = LeakyReLU(0.2)(nn)
+
 		nn = Conv2D(self.nf*4, (filter_w, filter_w), strides=(2, 2), padding='same',
 			kernel_initializer=TruncatedNormal(stddev=0.02), bias_initializer=Constant(0.0))(nn)
-		nn = LeakyReLU(0.2)(nn)
 		nn = InstanceNormalization2D()(nn)
+		nn = LeakyReLU(0.2)(nn)
+
 		nn = Conv2D(self.nf*8, (filter_w, filter_w), strides=(1, 1), padding='same',
 			kernel_initializer=TruncatedNormal(stddev=0.02), bias_initializer=Constant(0.0))(nn)
-		nn = LeakyReLU(0.2)(nn)
 		nn = InstanceNormalization2D()(nn)
-		dis = Conv2D(1, (filter_w, filter_w), strides=(1, 1), padding='same',
+		nn = LeakyReLU(0.2)(nn)
+
+		nn = Conv2D(1, (filter_w, filter_w), strides=(1, 1), padding='same',
 			kernel_initializer=TruncatedNormal(stddev=0.02), bias_initializer=Constant(0.0))(nn)
-		discriminator = Model(inputs=input_dis, outputs=dis)
+		
+		if needSigmoid:
+			nn = Activation('sigmoid')(nn)
+
+		discriminator = Model(inputs=input_dis, outputs=nn, name=self.name)
 		# discriminator.compile(loss=, optimizer=adam)
 		if needSum:
 			discriminator.summary()
@@ -144,8 +145,8 @@ class Discriminator:
 			raise 'In {}, argument \"next_model\" does not have model attribute '.format(self.__class__.__name__)
 		return Model(inputs=self.model.input, outputs=next_networks.model(self.model.output))
 
-	def predict(self, **kwargs):
-		return self.model.predict(**kwargs)
+	def predict(self, X):
+		return self.model.predict(X)
 
 	def fit(self, **kwargs):
 		return self.model.fit(**kwargs)
@@ -213,8 +214,8 @@ class CycleGAN:
 			print ('Epoch {}'.format(i+1))
 			self.collect_images()
 
-			A_fake = self.update_fake_pool(self.fake_images_A, self.genA.predict(x=self.inputB), self.fake_num_A)
-			B_fake = self.update_fake_pool(self.fake_images_B, self.genB.predict(x=self.inputA), self.fake_num_B)
+			A_fake = self.update_fake_pool(self.fake_images_A, self.genA.predict(self.inputB), self.fake_num_A)
+			B_fake = self.update_fake_pool(self.fake_images_B, self.genB.predict(self.inputA), self.fake_num_B)
 
 			ones  = np.ones((self.batch_img_num,) + self.trainnerG.output_shape[0][1:])
 			zeros = np.zeros((self.batch_img_num, ) + self.trainnerG.output_shape[0][1:])
@@ -237,25 +238,28 @@ class CycleGAN:
 			print ('Real A: {}, Fake A: {}, Real B: {}, Fake B: {}'.format(rA_dloss, fA_dloss, rB_dloss, fB_dloss))
 
 			print ('Discriminator A (accuracy) : real({}), fake({})'.format(
-				self.clf_A.predict(x=self.inputA).mean(), self.clf_A.predict(x=A_fake).mean()))
+				self.clf_A.predict(self.inputA).mean(), self.clf_A.predict(A_fake).mean()))
 
 			sys.stdout.flush()
 
 			if (i+1) % save_period == 0 and pic_dir is not None:
 
 				ImageA = self.inputA # N * W * W * l
-				ImageA2B = self.genB.predict(x=self.inputA)
-				ImageA2B2A = self.genA.predict(x=ImageA2B)
+				ImageA2B = self.genB.predict(self.inputA)
+				ImageA2B2A = self.genA.predict(ImageA2B)
 				ImageB = self.inputB # 1 * N * W * W * l
-				ImageB2A = self.genA.predict(x=self.inputB)
-				ImageB2A2B = self.genB.predict(x=ImageB2A)
+				ImageB2A = self.genA.predict(self.inputB)
+				ImageB2A2B = self.genB.predict(ImageB2A)
 
 				ImageA2B = sharpen(ImageA2B)
 				ImageA2B2A = sharpen(ImageA2B2A)
 				ImageB2A = sharpen(ImageB2A)
 				ImageB2A2B = sharpen(ImageB2A2B)
 
-				Imgs = np.r_[ ImageA, ImageA2B, ImageA2B2A, ImageB, ImageB2A, ImageB2A2B ].astype(np.uint8)
+				np.save('ia2b'+str(i), ImageA2B)
+				np.save('ib2a'+str(i), ImageB2A)
+
+				Imgs = np.r_[ ImageA, ImageA2B, ImageA2B2A, ImageB, ImageB2A, ImageB2A2B ] / 256
 
 				saveImg(Imgs, sub_w = len(ImageA), path = os.path.join(pic_dir, '{}.jpg'.format(i)))
 

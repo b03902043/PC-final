@@ -1,6 +1,6 @@
 from keras.models import Model, Sequential, model_from_json
 from keras.layers import Input, Flatten, Dropout, Embedding, Dense, Activation, Merge
-from keras.layers.convolutional import Conv2D, Conv2DTranspose, UpSampling2D
+from keras.layers.convolutional import Conv2D, Conv2DTranspose, UpSampling2D, ZeroPadding2D
 from keras.layers.core import Dense, Dropout, Activation, Reshape
 from keras.layers.pooling import MaxPooling2D
 from keras.layers.merge import Add, Concatenate, Dot
@@ -71,13 +71,19 @@ def deconv2d(tensor, n_feature, kernel_shape, strides=(1, 1), padding='valid'):
 
 
 def build_resnet_block(i_res, dim, name="resnet", res_layer_num=2):
-	res_out = Conv2D(dim, (3, 3), activation='relu', strides=(1, 1), padding='same', 
-		kernel_initializer=TruncatedNormal(stddev=0.02), bias_initializer=Constant(0.0))(i_res)
-	for i in range(res_layer_num-1):
-		res_out = Conv2D(dim, (3, 3), strides=(1, 1), padding='same',
+	res_out = ZeroPadding2D()(i_res)
+	res_out = Conv2D(dim, (3, 3), strides=(1, 1), padding='valid', 
+		kernel_initializer=TruncatedNormal(stddev=0.02), bias_initializer=Constant(0.0))(res_out)
+	res_out = InstanceNormalization2D()(res_out)
+
+	for i in range(res_layer_num - 1):
+		res_out = Activation('relu')(res_out)
+		res_out = ZeroPadding2D()(res_out)
+		res_out = Conv2D(dim, (3, 3), strides=(1, 1), padding='valid',
 			kernel_initializer=TruncatedNormal(stddev=0.02), bias_initializer=Constant(0.0))(res_out)
+		res_out = InstanceNormalization2D()(res_out)
+
 	res_out = Add()([res_out, i_res])
-	res_out = Activation('relu')(res_out)
 	return res_out
 
 def sharpen(data):
@@ -100,12 +106,13 @@ def randReadImg(tag, num, shp=(256, 256, 3), printName=False):
 def saveImg(imgs, sub_w = 5, path = None):
 
 	num = len(imgs)
+	sub_h = (num+sub_w-1) / sub_w
 
 	if path is not None and HasMatPlotLib:
 		# save
 		fig = plt.figure()
 		for i in range(num):
-			ax = fig.add_subplot(sub_w, sub_w, i+1)
+			ax = fig.add_subplot(sub_h, sub_w, i+1)
 			ax.set_axis_off()
 			ax.imshow(imgs[i])
 		plt.savefig(path)
