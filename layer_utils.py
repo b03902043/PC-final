@@ -92,8 +92,8 @@ def sharpen(data):
 		data = data.reshape((1, ) + data.shape)
 	return data
 
-def randReadImg(tag, num, shp=(256, 256, 3), printName=False):
-	fo = 'input/apple2orange/train{}'.format(tag)
+def randReadImg(tag, num, shp=(256, 256, 3), printName=False, task_name = 'apple2orange'):
+	fo = 'input/{}/train{}'.format(task_name, tag)
 	fs = [f for f in os.listdir(fo) if os.path.isfile(os.path.join(fo, f))]
 	ret = np.zeros(shape=((num, ) + shp))
 	for _ in range(num):
