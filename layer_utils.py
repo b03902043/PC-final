@@ -112,12 +112,12 @@ def saveImg(imgs, sub_w = 5, path = None):
 
 	if path is not None and HasMatPlotLib:
 		# save
-		fig = plt.figure()
+		fig = plt.figure(figsize=(sub_w, sub_h))
 		for i in range(num):
 			ax = fig.add_subplot(sub_h, sub_w, i+1)
 			ax.set_axis_off()
 			ax.imshow(imgs[i])
-		plt.savefig(path)
+		plt.savefig(path, dpi=300)
 		plt.clf()
 
 def simple_save(path, obj):
