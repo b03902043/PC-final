@@ -90,8 +90,8 @@ class Generator:
 		nn = InstanceNormalization2D()(nn)
 		nn = Activation('relu')(nn)
 
-		# nn = ZeroPadding2D((3, 3))(nn)
-		gen = Conv2D(3, (7, 7), activation='tanh', strides=(1, 1), padding='same')(nn)
+		nn = ZeroPadding2D((3, 3))(nn)
+		gen = Conv2D(3, (7, 7), activation='tanh', strides=(1, 1), padding='valid')(nn)
 		
 		generator = Model(inputs=input_gen, outputs=gen)
 		if needSum:
