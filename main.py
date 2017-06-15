@@ -11,7 +11,7 @@ def make_trainable(net, val):
 
 output_folder = 'output'
 
-cycle_gan = CycleGAN(num_features=32, shape=(128, 128, 3), bch_img_num=10)
+cycle_gan = CycleGAN(num_features=32, shape=(128, 128, 3), bch_img_num=10, task_name='summer2winter_yosemite')
 try:
 	cycle_gan.fit(epoch_num=200, disc_iter=10, save_period=1, pic_dir=output_folder)
 	cycle_gan.save(path=output_folder)

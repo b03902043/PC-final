@@ -199,7 +199,7 @@ class Discriminator:
 
 class CycleGAN:
 
-	def __init__(self, num_features = 64, shape = (256, 256, 3), bch_img_num = 10, ps = 50):
+	def __init__(self, num_features = 64, shape = (256, 256, 3), bch_img_num = 10, ps = 50, task_name='apple2orange'):
 		# print 'Init CycleGAN'
 		self.shp = shape
 		self.nf = num_features
@@ -209,11 +209,12 @@ class CycleGAN:
 		self.pool_size = ps if bch_img_num < ps else bch_img_num
 		self.fake_images_A, self.fake_num_A = np.zeros((self.pool_size, ) + shape), 0
 		self.fake_images_B, self.fake_num_B = np.zeros((self.pool_size, ) + shape), 0
+		self.task_name = task_name
 		self.setup_model()
 
 	def collect_images(self, A = None, B = None):
-		self.inputA = randReadImg('A', self.batch_img_num, shp = self.shp) / 127.5 - 1
-		self.inputB = randReadImg('B', self.batch_img_num, shp = self.shp) / 127.5 - 1
+		self.inputA = randReadImg('A', self.batch_img_num, shp = self.shp, task_name=self.task_name) / 127.5 - 1
+		self.inputB = randReadImg('B', self.batch_img_num, shp = self.shp, task_name=self.task_name) / 127.5 - 1
 
 	'''
 		The function setup the model for training
@@ -269,6 +270,11 @@ class CycleGAN:
 		self.trainnerD.compile(optimizer=self.dopt, loss='MSE')
 
 	def fit(self, epoch_num = 10, disc_iter = 10, save_period = 1, pic_dir = None):
+
+		if not os.path.isdir(pic_dir):
+			os.makedirs(pic_dir)
+
+		pic_dir = os.path.join(pic_dir, self.task_name)
 
 		if not os.path.isdir(pic_dir):
 			os.makedirs(pic_dir)
