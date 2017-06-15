@@ -378,13 +378,13 @@ class CycleGAN:
 		if not os.path.isdir(rpath):
 			os.makedirs(rpath)
 
-		plot_model(self.trainnerG, to_file=os.path.join(rpath, 'trainnerG.png'), show_shapes=True)
-		plot_model(self.trainnerD, to_file=os.path.join(rpath, 'trainnerD.png'), show_shapes=True)
-
 		self.genB.save(os.path.join(rpath, 'a2b.h5'))
 		self.genA.save(os.path.join(rpath, 'b2a.h5'))
 		self.clf_A.save(os.path.join(rpath, 'clfA.h5'))
 		self.clf_B.save(os.path.join(rpath, 'clfB.h5'))
 		self.trainnerG.save_weights(os.path.join(rpath, 'trainnerG.h5'))
 		self.trainnerD.save_weights(os.path.join(rpath, 'trainnerD.h5'))
+
+		plot_model(self.trainnerG, to_file=os.path.join(rpath, 'trainnerG.png'), show_shapes=True)
+		plot_model(self.trainnerD, to_file=os.path.join(rpath, 'trainnerD.png'), show_shapes=True)
 
