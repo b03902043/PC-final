@@ -1,0 +1,5 @@
+keras==2.0.4
+tensorflow==1.1.0
+numpy
+pillow
+matplotlib
