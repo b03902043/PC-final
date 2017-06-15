@@ -339,7 +339,7 @@ class CycleGAN:
 				Imgs = ( np.r_[ ImageA, ImageA2B, ImageA2B2A, ImageB, ImageB2A, ImageB2A2B ] + 1 ) * 0.5
 				saveImg(Imgs, sub_w = len(ImageA), path = os.path.join(pic_dir, '{}.jpg'.format(i)))
 				del Imgs, ImageA2B, ImageA2B2A, ImageB2A, ImageB2A2B
-			del self.inputA, self.input_B, ones, zeros, A_fake, B_fake
+			del self.inputA, self.inputB, ones, zeros, A_fake, B_fake
 			gc.collect()
 
 			self.fake_num_A += self.batch_img_num
