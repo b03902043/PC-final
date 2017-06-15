@@ -268,10 +268,11 @@ class CycleGAN:
 			[clf_realA, clf_fakeA, clf_realB, clf_fakeB])
 		self.trainnerD.compile(optimizer=self.dopt, loss='MSE')
 
-		plot_model(self.trainnerG, to_file=os.path.join('output/trainnerG.png'), show_shapes=True)
-		plot_model(self.trainnerD, to_file=os.path.join('output/trainnerD.png'), show_shapes=True)
-
 	def fit(self, epoch_num = 10, disc_iter = 10, save_period = 1, pic_dir = None):
+
+		if not os.path.isdir(pic_dir):
+			os.makedirs(pic_dir)
+
 		for i in range(epoch_num):
 			print ('Epoch {}'.format(i+1))
 
@@ -330,11 +331,8 @@ class CycleGAN:
 				# np.save(os.path.join(pic_dir, 'ib2a'+str(i)), ImageB2A)
 
 				Imgs = ( np.r_[ ImageA, ImageA2B, ImageA2B2A, ImageB, ImageB2A, ImageB2A2B ] + 1 ) * 0.5
-
 				saveImg(Imgs, sub_w = len(ImageA), path = os.path.join(pic_dir, '{}.jpg'.format(i)))
 
-
-				
 
 			self.fake_num_A += self.batch_img_num
 			self.fake_num_B += self.batch_img_num
@@ -370,6 +368,13 @@ class CycleGAN:
 
 	def save(self, path):
 		rpath = os.path.join(path, 'models')
+
+		if not os.path.isdir(rpath):
+			os.makedirs(rpath)
+
+		plot_model(self.trainnerG, to_file=os.path.join(rpath, 'trainnerG.png'), show_shapes=True)
+		plot_model(self.trainnerD, to_file=os.path.join(rpath, 'trainnerD.png'), show_shapes=True)
+
 		self.genB.save(os.path.join(rpath, 'a2b.h5'))
 		self.genA.save(os.path.join(rpath, 'b2a.h5'))
 		self.clf_A.save(os.path.join(rpath, 'clfA.h5'))
