@@ -53,12 +53,11 @@ class Generator:
 		self.input_num = 0	# input_num
 		self.model = self.build_model(res_cnt) if Cmodel is None else Cmodel
 
-	def build_model(self, res_cnt, needSum = True):
+	def build_model(self, res_cnt, needSum = False):
 		input_gen = Input(shape=self.img_size)
 		# print ('input shape : ' + str(input_gen.get_shape()))
 		# input_gen = Refl
-		if res_cnt == 6:
-			nn = ZeroPadding2D((3, 3))(input_gen)
+		nn = ZeroPadding2D((3, 3))(input_gen)
 		nn = conv2d(nn, self.nf, (7, 7), strides=(1, 1))
 		nn = conv2d(nn, self.nf*2, (3, 3), strides=(2, 2), padding='same')
 		nn = conv2d(nn, self.nf*4, (3, 3), strides=(2, 2), padding='same')
@@ -265,8 +264,8 @@ class CycleGAN:
 		# if not hasattr(self, 'inputA') or not hasattr(self, 'inputB'):
 		# 	raise Exception('Input must be assigned before setup model')
 
-		self.genB = Generator(name='GenA2B', im_shape=self.shp, num_features=self.ngf)
-		self.genA = Generator(name='GenB2A', im_shape=self.shp, num_features=self.ngf)
+		self.genB = Generator(name='GenA2B', im_shape=self.shp, num_features=self.ngf, res_cnt=6 if self.shp[0] == 128 else 9)
+		self.genA = Generator(name='GenB2A', im_shape=self.shp, num_features=self.ngf, res_cnt=6 if self.shp[0] == 128 else 9)
 		self.clf_A = Discriminator(name='clf_A', im_shape=self.shp, num_features=self.ndf)	# clf input0 = real, input1 = fake
 		self.clf_B = Discriminator(name='clf_B', im_shape=self.shp, num_features=self.ndf)
 
