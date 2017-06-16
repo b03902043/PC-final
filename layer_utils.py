@@ -3,6 +3,7 @@ from keras.layers import Input, Flatten, Dropout, Embedding, Dense, Activation, 
 from keras.layers.convolutional import Conv2D, Conv2DTranspose, UpSampling2D, ZeroPadding2D
 from keras.layers.core import Dense, Dropout, Activation, Reshape
 from keras.layers.pooling import MaxPooling2D
+from keras.layers.advanced_activations import LeakyReLU
 from keras.layers.merge import Add, Concatenate, Dot
 from keras.utils import plot_model
 import keras.backend as K
@@ -24,10 +25,9 @@ except:
 		HasMatPlotLib = True
 else:
 	HasMatPlotLib = True
-
 import matplotlib.pyplot as plt
-
 from keras.engine.topology import Layer
+import tensorflow as tf
 
 class InstanceNormalization2D(Layer):
 	''' Thanks for github.com/jayanthkoushik/neural-style '''
@@ -35,11 +35,15 @@ class InstanceNormalization2D(Layer):
 		super(InstanceNormalization2D, self).__init__(**kwargs)
 
 	def build(self, input_shape):
-		self.scale = self.add_weight(name='scale', shape=(input_shape[1],), initializer="one", trainable=True)
-		self.shift = self.add_weight(name='shift', shape=(input_shape[1],), initializer="zero", trainable=True)
+		self.scale = self.add_weight(name='scale', shape=(input_shape[1],), 
+			initializer=TruncatedNormal(mean=1.0, stddev=0.02), trainable=True)
+		self.shift = self.add_weight(name='shift', shape=(input_shape[1],), 
+			initializer=Constant(0.0), trainable=True)
 		super(InstanceNormalization2D, self).build(input_shape)
 
 	def call(self, x, mask=None):
+		epsilon = 1e-5
+
 		def image_expand(tensor):
 			return K.expand_dims(K.expand_dims(tensor, -1), -1)
 
@@ -50,40 +54,63 @@ class InstanceNormalization2D(Layer):
 		mu = K.sum(x, [-1, -2]) / hw
 		mu_vec = image_expand(mu) 
 		sig2 = K.sum(K.square(x - mu_vec), [-1, -2]) / hw
-		y = (x - mu_vec) / (K.sqrt(image_expand(sig2)) + K.epsilon())
+		y = (x - mu_vec) / (K.sqrt(image_expand(sig2) + epsilon))
 
 		scale = batch_image_expand(self.scale)
 		shift = batch_image_expand(self.shift)
 		return scale*y + shift 
-#	   else:
-#		   raise NotImplemented("Please complete `CycGAN/layers/padding.py` to run on backend {}.".format(K.backend()))
 
 	def compute_output_shape(self, input_shape):
 		return input_shape 
+
+class ReflectPadding2D(Layer):
+	def __init__(self, padding = 1, **kwargs):
+		self.padding = padding
+		super(ReflectPadding2D, self).__init__(**kwargs)
+
+	def build(self, input_shape):
+		super(ReflectPadding2D, self).build(input_shape)
+
+	def call(self, x, mask=None):
+		w, h = K.int_shape(x)[1:3]
+		left, right, top, down = x[:, :, 0], x[:, :, -1], x[:, 0], x[:, -1]
+		x = ZeroPadding2D((self.padding, self.padding))(x)
+		return x
+
+	def compute_output_shape(self, input_shape):
+		return (input_shape[0], input_shape[1]+2*self.padding, input_shape[2]+2*self.padding, input_shape[3])
 
 class DeConv2D(Conv2DTranspose):
 	def get_output_shape_for_(self):
 		pass
 
-def deconv2d(tensor, n_feature, kernel_shape, strides=(1, 1), padding='valid'):
-	ret = UpSampling2D(strides)(tensor)
-	ret = Conv2D(n_feature, kernel_shape, padding=padding)(ret)
-	return ret
+def conv2d(tensor, num_feature, kernel_shape=(3, 3), strides=(1, 1), padding='valid',
+	kernel_std=0.02, bias_init=0.0, up_sample=1, norm=True, relu=True, relu_alpha=0.0 ):
+	if up_sample > 1:
+		nn = UpSampling2D(size=(up_sample, up_sample))(tensor)
+	else:
+		nn = tensor
 
+	# pad = int(np.floor(kernel_shape[0] / 2))
+	# nn = ZeroPadding2D(padding=(pad, pad))(nn)
+	nn = Conv2D(num_feature, kernel_shape, strides=strides, padding=padding,
+		kernel_initializer=TruncatedNormal(stddev=kernel_std), bias_initializer=Constant(bias_init))(nn)
 
-def build_resnet_block(i_res, dim, name="resnet", res_layer_num=2):
-	res_out = ZeroPadding2D()(i_res)
-	res_out = Conv2D(dim, (3, 3), strides=(1, 1), padding='valid', 
-		kernel_initializer=TruncatedNormal(stddev=0.02), bias_initializer=Constant(0.0))(res_out)
-	res_out = InstanceNormalization2D()(res_out)
+	if norm:
+		nn = InstanceNormalization2D()(nn)
+		
+	if relu:
+		nn = LeakyReLU(relu_alpha)(nn)
 
-	for i in range(res_layer_num - 1):
-		res_out = Activation('relu')(res_out)
-		res_out = ZeroPadding2D()(res_out)
-		res_out = Conv2D(dim, (3, 3), strides=(1, 1), padding='valid',
-			kernel_initializer=TruncatedNormal(stddev=0.02), bias_initializer=Constant(0.0))(res_out)
-		res_out = InstanceNormalization2D()(res_out)
+	return nn
 
+def build_resnet_block(i_res, dim):
+	# res_out = tf.pad(i_res, [[0, 0], [1, 1], [1, 1], [0, 0]], "REFLECT")
+	res_out = ZeroPadding2D((1, 1))(i_res)
+	res_out = conv2d(res_out, dim)
+	# res_out = tf.pad(res_out, [[0, 0], [1, 1], [1, 1], [0, 0]], "REFLECT")
+	res_out = ZeroPadding2D((1, 1))(res_out)
+	res_out = conv2d(res_out, dim, relu=False)
 	res_out = Add()([res_out, i_res])
 	return res_out
 

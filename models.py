@@ -1,5 +1,5 @@
 from keras.models import Model, Sequential, model_from_json
-from keras.layers import Input, Flatten, Dropout, Embedding, Dense, Activation, Merge
+from keras.layers import Input, Flatten, Dropout, Embedding, Dense, Activation, Merge, Lambda
 from keras.layers.convolutional import Conv2D, Conv2DTranspose, ZeroPadding2D
 from keras.layers.core import Dense, Dropout, Activation, Reshape
 from keras.layers.pooling import MaxPooling2D
@@ -46,53 +46,65 @@ def init_network(model):
 
 class Generator:
 
-	def __init__(self, num_features=64, im_shape = (256, 256, 3), name='generator', Cmodel = None):
+	def __init__(self, num_features=64, im_shape = (256, 256, 3), name='generator', Cmodel = None, res_cnt = 6):
 		self.nf = num_features
 		self.img_size = im_shape
 		self.name = name
 		self.input_num = 0	# input_num
-		self.model = self.build_model() if Cmodel is None else Cmodel
+		self.model = self.build_model(res_cnt) if Cmodel is None else Cmodel
 
-	def build_model(self, needSum = False):
+	def build_model(self, res_cnt, needSum = True):
 		input_gen = Input(shape=self.img_size)
 		# print ('input shape : ' + str(input_gen.get_shape()))
-		nn = Conv2D(self.nf, (7, 7), strides=(1, 1), padding='same')(input_gen)
-		nn = InstanceNormalization2D()(nn)
-		# nn = BatchNormalization()(nn)
-		nn = Activation('relu')(nn)
-		nn = Conv2D(self.nf*2, (3, 3), strides=(2, 2), padding='same')(nn)
-		nn = InstanceNormalization2D()(nn)
-		# nn = BatchNormalization()(nn)
-		nn = Activation('relu')(nn)
-		nn = Conv2D(self.nf*4, (3, 3), strides=(2, 2), padding='same')(nn)
-		nn = InstanceNormalization2D()(nn)
-		# nn = BatchNormalization()(nn)
-		nn = Activation('relu')(nn)
+		# input_gen = Refl
+		if res_cnt == 6:
+			nn = ZeroPadding2D((3, 3))(input_gen)
+		nn = conv2d(nn, self.nf, (7, 7), strides=(1, 1))
+		nn = conv2d(nn, self.nf*2, (3, 3), strides=(2, 2), padding='same')
+		nn = conv2d(nn, self.nf*4, (3, 3), strides=(2, 2), padding='same')
+
+
+		# nn = Conv2D(self.nf, (7, 7), strides=(1, 1), padding='same')(input_gen)
+		# nn = InstanceNormalization2D()(nn)
+		# # nn = BatchNormalization()(nn)
+		# nn = Activation('relu')(nn)
+		# nn = Conv2D(self.nf*2, (3, 3), strides=(2, 2), padding='same')(nn)
+		# nn = InstanceNormalization2D()(nn)
+		# # nn = BatchNormalization()(nn)
+		# nn = Activation('relu')(nn)
+		# nn = Conv2D(self.nf*4, (3, 3), strides=(2, 2), padding='same')(nn)
+		# nn = InstanceNormalization2D()(nn)
+		# # nn = BatchNormalization()(nn)
+		# nn = Activation('relu')(nn)
 
 		# transform
-		nn = build_resnet_block(nn, self.nf*4)
-		nn = build_resnet_block(nn, self.nf*4)
-		nn = build_resnet_block(nn, self.nf*4)
-		nn = build_resnet_block(nn, self.nf*4)
-		nn = build_resnet_block(nn, self.nf*4)
-		nn = build_resnet_block(nn, self.nf*4)
-
+		for i in range(res_cnt):
+			nn = build_resnet_block(nn, self.nf*4)
 
 		# decoding
-		# nn = Conv2DTranspose(self.nf*2, (3, 3), strides=(2, 2), padding='same')(nn)
-		nn = deconv2d(nn, self.nf*2, (3, 3), strides=(2, 2), padding='same')
-		# nn = BatchNormalization()(nn)
-		nn = InstanceNormalization2D()(nn)
-		nn = Activation('relu')(nn)
-		# nn = Conv2DTranspose(self.nf, (3, 3), strides=(2, 2), padding='same')(nn)
-		nn = deconv2d(nn, self.nf, (3, 3), strides=(2, 2), padding='same')
-		# nn = BatchNormalization()(nn)
-		nn = InstanceNormalization2D()(nn)
-		nn = Activation('relu')(nn)
+		nn = conv2d(nn, self.nf*2, (3, 3), strides=(1, 1), up_sample=2, padding='same')
+		nn = conv2d(nn, self.nf, (3, 3), strides=(1, 1), up_sample=2, padding='same')
+		if res_cnt == 6:
+			nn = ZeroPadding2D((3, 3))(nn)
+		nn = conv2d(nn, 3, (7, 7), strides=(1, 1), norm=False, relu=False, padding='valid' if res_cnt == 6 else 'same')
 
-		nn = ZeroPadding2D((3, 3))(nn)
-		gen = Conv2D(3, (7, 7), activation='tanh', strides=(1, 1), padding='valid')(nn)
+		# nn = Conv2DTranspose(self.nf*2, (3, 3), strides=(2, 2), padding='same')(nn)
+		# nn = deconv2d(nn, self.nf*2, (3, 3), strides=(2, 2), padding='same')
+		# # nn = BatchNormalization()(nn)
+		# nn = InstanceNormalization2D()(nn)
+		# nn = Activation('relu')(nn)
+		# # nn = Conv2DTranspose(self.nf, (3, 3), strides=(2, 2), padding='same')(nn)
+		# nn = deconv2d(nn, self.nf, (3, 3), strides=(2, 2), padding='same')
+		# # nn = BatchNormalization()(nn)
+		# nn = InstanceNormalization2D()(nn)
+		# nn = Activation('relu')(nn)
+
+		# nn = ZeroPadding2D((3, 3))(nn)
+		# gen = Conv2D(3, (7, 7), activation='tanh', strides=(1, 1), padding='valid')(nn)
 		
+		gen = Activation('tanh')(nn)
+		# print input_gen.get_shape()
+
 		generator = Model(inputs=input_gen, outputs=gen)
 		if needSum:
 			generator.summary()
@@ -137,26 +149,43 @@ class Discriminator:
 	def build_model(self, needSum = False, needSigmoid = False):
 		filter_w = 4
 		input_dis = Input(shape=self.img_size)
-		nn = Conv2D(self.nf, (filter_w, filter_w), strides=(2, 2), padding='same',
-			kernel_initializer=TruncatedNormal(stddev=0.02), bias_initializer=Constant(0.0))(input_dis)
-		nn = LeakyReLU(0.2)(nn)
-		nn = Conv2D(self.nf*2, (filter_w, filter_w), strides=(2, 2), padding='same',
-			kernel_initializer=TruncatedNormal(stddev=0.02), bias_initializer=Constant(0.0))(nn)
-		nn = InstanceNormalization2D()(nn)
-		nn = LeakyReLU(0.2)(nn)
 
-		nn = Conv2D(self.nf*4, (filter_w, filter_w), strides=(2, 2), padding='same',
-			kernel_initializer=TruncatedNormal(stddev=0.02), bias_initializer=Constant(0.0))(nn)
-		nn = InstanceNormalization2D()(nn)
-		nn = LeakyReLU(0.2)(nn)
+		nn = conv2d(input_dis, self.nf, (filter_w, filter_w), strides=(2, 2), padding='same',
+			kernel_std=0.02, bias_init=0.0, relu_alpha=0.2)
 
-		nn = Conv2D(self.nf*8, (filter_w, filter_w), strides=(1, 1), padding='same',
-			kernel_initializer=TruncatedNormal(stddev=0.02), bias_initializer=Constant(0.0))(nn)
-		nn = InstanceNormalization2D()(nn)
-		nn = LeakyReLU(0.2)(nn)
+		nn = conv2d(nn, self.nf*2, (filter_w, filter_w), strides=(2, 2), padding='same',
+			kernel_std=0.02, bias_init=0.0, relu_alpha=0.2)
 
-		nn = Conv2D(1, (filter_w, filter_w), strides=(1, 1), padding='same',
-			kernel_initializer=TruncatedNormal(stddev=0.02), bias_initializer=Constant(0.0))(nn)
+		nn = conv2d(nn, self.nf*4, (filter_w, filter_w), strides=(2, 2), padding='same',
+			kernel_std=0.02, bias_init=0.0, relu_alpha=0.2)
+
+		nn = conv2d(nn, self.nf*8, (filter_w, filter_w), strides=(1, 1), padding='same',
+			kernel_std=0.02, bias_init=0.0, relu_alpha=0.2)
+
+		nn = conv2d(nn, 1, (filter_w, filter_w), strides=(1, 1), padding='same',
+			kernel_std=0.02, bias_init=0.0, relu=False, norm=False)
+
+		# nn = Conv2D(self.nf, (filter_w, filter_w), strides=(2, 2), padding='same',
+		# 	kernel_initializer=TruncatedNormal(stddev=0.02), bias_initializer=Constant(0.0))(input_dis)
+		# nn = LeakyReLU(0.2)(nn)
+
+		# nn = Conv2D(self.nf*2, (filter_w, filter_w), strides=(2, 2), padding='same',
+		# 	kernel_initializer=TruncatedNormal(stddev=0.02), bias_initializer=Constant(0.0))(nn)
+		# nn = InstanceNormalization2D()(nn)
+		# nn = LeakyReLU(0.2)(nn)
+
+		# nn = Conv2D(self.nf*4, (filter_w, filter_w), strides=(2, 2), padding='same',
+		# 	kernel_initializer=TruncatedNormal(stddev=0.02), bias_initializer=Constant(0.0))(nn)
+		# nn = InstanceNormalization2D()(nn)
+		# nn = LeakyReLU(0.2)(nn)
+
+		# nn = Conv2D(self.nf*8, (filter_w, filter_w), strides=(1, 1), padding='same',
+		# 	kernel_initializer=TruncatedNormal(stddev=0.02), bias_initializer=Constant(0.0))(nn)
+		# nn = InstanceNormalization2D()(nn)
+		# nn = LeakyReLU(0.2)(nn)
+
+		# nn = Conv2D(1, (filter_w, filter_w), strides=(1, 1), padding='same',
+		# 	kernel_initializer=TruncatedNormal(stddev=0.02), bias_initializer=Constant(0.0))(nn)
 		
 		if needSigmoid:
 			nn = Activation('sigmoid')(nn)
@@ -199,10 +228,11 @@ class Discriminator:
 
 class CycleGAN:
 
-	def __init__(self, num_features = 64, shape = (256, 256, 3), bch_img_num = 10, ps = 50, task_name='apple2orange'):
+	def __init__(self, ngf = 32, ndf = 64, shape = (256, 256, 3), bch_img_num = 10, ps = 50, task_name='apple2orange'):
 		# print 'Init CycleGAN'
 		self.shp = shape
-		self.nf = num_features
+		self.ngf = ngf
+		self.ndf = ndf
 		self.gopt = Adam(lr=0.0002, beta_1=0.5, beta_2=0.999)
 		self.dopt = Adam(lr=0.0002, beta_1=0.5, beta_2=0.999)
 		self.batch_img_num = bch_img_num
@@ -225,10 +255,10 @@ class CycleGAN:
 		# if not hasattr(self, 'inputA') or not hasattr(self, 'inputB'):
 		# 	raise Exception('Input must be assigned before setup model')
 
-		self.genB = Generator(name='GenA2B', im_shape=self.shp, num_features=self.nf)
-		self.genA = Generator(name='GenB2A', im_shape=self.shp, num_features=self.nf)
-		self.clf_A = Discriminator(name='clf_A', im_shape=self.shp, num_features=self.nf)	# clf input0 = real, input1 = fake
-		self.clf_B = Discriminator(name='clf_B', im_shape=self.shp, num_features=self.nf)
+		self.genB = Generator(name='GenA2B', im_shape=self.shp, num_features=self.ngf)
+		self.genA = Generator(name='GenB2A', im_shape=self.shp, num_features=self.ngf)
+		self.clf_A = Discriminator(name='clf_A', im_shape=self.shp, num_features=self.ndf)	# clf input0 = real, input1 = fake
+		self.clf_B = Discriminator(name='clf_B', im_shape=self.shp, num_features=self.ndf)
 
 		self.genA.model = init_network(self.genA.model)
 		self.genB.model = init_network(self.genB.model)
@@ -350,7 +380,7 @@ class CycleGAN:
 			This function saves the gen images to A/B image pools.
 			The return value represent the gen images to training
 		'''
-		overfull_num = (num_fakes + len(new_fakes) - 1) - self.pool_size
+		overfull_num = (num_fakes + len(new_fakes)) - self.pool_size
 		
 		if overfull_num > 0:
 			fake_pool = np.roll(fake_pool, -overfull_num)
