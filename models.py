@@ -228,7 +228,7 @@ class Discriminator:
 
 class CycleGAN:
 
-	def __init__(self, ngf = 32, ndf = 64, shape = (256, 256, 3), bch_img_num = 10, ps = 50, task_name='apple2orange'):
+	def __init__(self, ngf = 32, ndf = 64, shape = (256, 256, 3), bch_img_num = 10, ps = 50, task_name='apple2orange', pic_dir=None):
 		# print 'Init CycleGAN'
 		self.shp = shape
 		self.ngf = ngf
@@ -240,11 +240,21 @@ class CycleGAN:
 		self.fake_images_A, self.fake_num_A = np.zeros((self.pool_size, ) + shape), 0
 		self.fake_images_B, self.fake_num_B = np.zeros((self.pool_size, ) + shape), 0
 		self.task_name = task_name
+		self.pic_dir = pic_dir
+		if self.pic_dir is not None:
+			self.check_dir()
 		self.setup_model()
 
 	def collect_images(self, A = None, B = None):
 		self.inputA = randReadImg('A', self.batch_img_num, shp = self.shp, task_name=self.task_name) / 127.5 - 1
 		self.inputB = randReadImg('B', self.batch_img_num, shp = self.shp, task_name=self.task_name) / 127.5 - 1
+
+	def check_dir(self):
+		if not os.path.isdir(self.pic_dir):
+			os.makedirs(self.pic_dir)
+		self.pic_dir = os.path.join(self.pic_dir, self.task_name)
+		if not os.path.isdir(self.pic_dir):
+			os.makedirs(self.pic_dir)
 
 	'''
 		The function setup the model for training
@@ -299,15 +309,7 @@ class CycleGAN:
 			[clf_realA, clf_fakeA, clf_realB, clf_fakeB])
 		self.trainnerD.compile(optimizer=self.dopt, loss='MSE')
 
-	def fit(self, epoch_num = 10, disc_iter = 10, save_period = 1, pic_dir = None):
-
-		if not os.path.isdir(pic_dir):
-			os.makedirs(pic_dir)
-
-		pic_dir = os.path.join(pic_dir, self.task_name)
-
-		if not os.path.isdir(pic_dir):
-			os.makedirs(pic_dir)
+	def fit(self, epoch_num = 10, disc_iter = 10, save_period = 1):
 
 		for i in range(epoch_num):
 			print ('Epoch {}'.format(i+1))
@@ -347,7 +349,7 @@ class CycleGAN:
 
 			sys.stdout.flush()
 
-			if (i+1) % save_period == 0 and pic_dir is not None:
+			if (i+1) % save_period == 0 and self.pic_dir is not None:
 
 				max_width = 10
 
@@ -367,7 +369,7 @@ class CycleGAN:
 				# np.save(os.path.join(pic_dir, 'ib2a'+str(i)), ImageB2A)
 
 				Imgs = ( np.r_[ ImageA, ImageA2B, ImageA2B2A, ImageB, ImageB2A, ImageB2A2B ] + 1 ) * 0.5
-				saveImg(Imgs, sub_w = len(ImageA), path = os.path.join(pic_dir, '{}.jpg'.format(i)))
+				saveImg(Imgs, sub_w = len(ImageA), path = os.path.join(self.pic_dir, '{}.jpg'.format(i)))
 				del Imgs, ImageA2B, ImageA2B2A, ImageB2A, ImageB2A2B
 			del self.inputA, self.inputB, ones, zeros, A_fake, B_fake
 			gc.collect()
@@ -405,7 +407,7 @@ class CycleGAN:
 			K.set_value(md.optimizer.lr, lr_base)
 
 	def save(self, path):
-		rpath = os.path.join(path, 'models')
+		rpath = os.path.join(path, self.pic_dir+'-models')
 
 		if not os.path.isdir(rpath):
 			os.makedirs(rpath)
