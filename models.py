@@ -55,26 +55,12 @@ class Generator:
 
 	def build_model(self, res_cnt, needSum = False):
 		input_gen = Input(shape=self.img_size)
-		# print ('input shape : ' + str(input_gen.get_shape()))
-		# input_gen = Refl
+
+		# encoding
 		nn = ZeroPadding2D((3, 3))(input_gen)
 		nn = conv2d(nn, self.nf, (7, 7), strides=(1, 1))
 		nn = conv2d(nn, self.nf*2, (3, 3), strides=(2, 2), padding='same')
 		nn = conv2d(nn, self.nf*4, (3, 3), strides=(2, 2), padding='same')
-
-
-		# nn = Conv2D(self.nf, (7, 7), strides=(1, 1), padding='same')(input_gen)
-		# nn = InstanceNormalization2D()(nn)
-		# # nn = BatchNormalization()(nn)
-		# nn = Activation('relu')(nn)
-		# nn = Conv2D(self.nf*2, (3, 3), strides=(2, 2), padding='same')(nn)
-		# nn = InstanceNormalization2D()(nn)
-		# # nn = BatchNormalization()(nn)
-		# nn = Activation('relu')(nn)
-		# nn = Conv2D(self.nf*4, (3, 3), strides=(2, 2), padding='same')(nn)
-		# nn = InstanceNormalization2D()(nn)
-		# # nn = BatchNormalization()(nn)
-		# nn = Activation('relu')(nn)
 
 		# transform
 		for i in range(res_cnt):
@@ -86,28 +72,11 @@ class Generator:
 		if res_cnt == 6:
 			nn = ZeroPadding2D((3, 3))(nn)
 		nn = conv2d(nn, 3, (7, 7), strides=(1, 1), norm=False, relu=False, padding='valid' if res_cnt == 6 else 'same')
-
-		# nn = Conv2DTranspose(self.nf*2, (3, 3), strides=(2, 2), padding='same')(nn)
-		# nn = deconv2d(nn, self.nf*2, (3, 3), strides=(2, 2), padding='same')
-		# # nn = BatchNormalization()(nn)
-		# nn = InstanceNormalization2D()(nn)
-		# nn = Activation('relu')(nn)
-		# # nn = Conv2DTranspose(self.nf, (3, 3), strides=(2, 2), padding='same')(nn)
-		# nn = deconv2d(nn, self.nf, (3, 3), strides=(2, 2), padding='same')
-		# # nn = BatchNormalization()(nn)
-		# nn = InstanceNormalization2D()(nn)
-		# nn = Activation('relu')(nn)
-
-		# nn = ZeroPadding2D((3, 3))(nn)
-		# gen = Conv2D(3, (7, 7), activation='tanh', strides=(1, 1), padding='valid')(nn)
-		
 		gen = Activation('tanh')(nn)
-		# print input_gen.get_shape()
 
 		generator = Model(inputs=input_gen, outputs=gen)
 		if needSum:
 			generator.summary()
-		# plot_model(generator, to_file='gen.png')
 
 		return generator
 
@@ -131,8 +100,10 @@ class Generator:
 	def compile(self, **kwargs):
 		return self.model.compile(**kwargs)
 
-	def save(self, path):
-		self.model.save_weights(path)
+	def save(self, path, with_img=False, show_shapes=True):
+		self.model.save_weights(path+'.h5')
+		if with_img:
+			plot_model(self.model, to_file=path+'.png', show_shapes=show_shapes)
 
 	def load(self, path, **kwargs):
 		self.model.load_weights(path, **kwargs)
@@ -219,8 +190,10 @@ class Discriminator:
 	def compile(self, **kwargs):
 		return self.model.compile(**kwargs)
 
-	def save(self, path):
-		self.model.save_weights(path)
+	def save(self, path, with_img=False, show_shapes=True):
+		self.model.save_weights(path+'.h5')
+		if with_img:
+			plot_model(self.model, to_file=path+'.png', show_shapes=show_shapes)
 
 	def load(self, path, **kwargs):
 		self.model.load_weights(path, **kwargs)
@@ -405,19 +378,24 @@ class CycleGAN:
 		for md in mds:
 			K.set_value(md.optimizer.lr, lr_base)
 
-	def save(self, path):
-		rpath = os.path.join(path, self.pic_dir+'-models')
+	def save(self, path = None, with_img = False, show_shapes = False, withParam = True):
+		path = self.pic_dir if path is None else path
+		rpath = path + '-models'
 
 		if not os.path.isdir(rpath):
 			os.makedirs(rpath)
 
-		self.genB.save(os.path.join(rpath, 'a2b.h5'))
-		self.genA.save(os.path.join(rpath, 'b2a.h5'))
-		self.clf_A.save(os.path.join(rpath, 'clfA.h5'))
-		self.clf_B.save(os.path.join(rpath, 'clfB.h5'))
-		self.trainnerG.save_weights(os.path.join(rpath, 'trainnerG.h5'))
-		self.trainnerD.save_weights(os.path.join(rpath, 'trainnerD.h5'))
+		if withParam:
+			self.genB.save(os.path.join(rpath, 'a2b'), with_img=with_img, show_shapes=show_shapes)
+			self.genA.save(os.path.join(rpath, 'b2a'), with_img=with_img, show_shapes=show_shapes)
+			self.clf_A.save(os.path.join(rpath, 'clfA'), with_img=with_img, show_shapes=show_shapes)
+			self.clf_B.save(os.path.join(rpath, 'clfB'), with_img=with_img, show_shapes=show_shapes)
+			self.trainnerG.save_weights(os.path.join(rpath, 'trainnerG.h5'))
+			self.trainnerD.save_weights(os.path.join(rpath, 'trainnerD.h5'))
 
-		plot_model(self.trainnerG, to_file=os.path.join(rpath, 'trainnerG.png'), show_shapes=True)
-		plot_model(self.trainnerD, to_file=os.path.join(rpath, 'trainnerD.png'), show_shapes=True)
+		if with_img:
+			plot_model(self.genA.model, to_file=os.path.join(rpath, 'genA.png'), show_shapes=show_shapes)
+			plot_model(self.clf_A.model, to_file=os.path.join(rpath, 'clfA.png'), show_shapes=show_shapes)
+			plot_model(self.trainnerG, to_file=os.path.join(rpath, 'trainnerG.png'), show_shapes=show_shapes)
+			plot_model(self.trainnerD, to_file=os.path.join(rpath, 'trainnerD.png'), show_shapes=show_shapes)
 

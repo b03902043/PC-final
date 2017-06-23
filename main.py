@@ -2,7 +2,6 @@ from models import *
 from layer_utils import *
 import os, sys
 
-
 # Freeze weights in the discriminator for stacked training
 def make_trainable(net, val):
 	net.trainable = val
@@ -15,7 +14,7 @@ cycle_gan = CycleGAN(shape=(128, 128, 3), bch_img_num=3, task_name='summer2winte
 	pic_dir=output_folder)
 try:
 	cycle_gan.fit(epoch_num=200, disc_iter=5, save_period=1)
-	cycle_gan.save(path=output_folder)
+	cycle_gan.save(with_img=False, show_shapes=True)
 except KeyboardInterrupt:
 	K.clear_session()
 	try:
